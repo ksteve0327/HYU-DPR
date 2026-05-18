@@ -3,7 +3,6 @@
 AI 시스템 반도체 특허 데이터를 Dense Passage Retrieval(DPR) 논문 구조에 맞춰 변환하고, BM25와 DPR bi-encoder의 Top-k retrieval accuracy를 비교한 실험 프로젝트입니다.
 
 > 원본 특허 CSV, 생성된 DPR train/dev/test 데이터, passage corpus, checkpoint, embedding, 대용량 retrieval dump는 GitHub에 포함하지 않습니다.
-> 원본 데이터 필요시 dabeenkim@hanyang.ac.kr로 연락 주시면 검토 후 전송 해드리겠습니다.
 
 ## What This Project Does
 
