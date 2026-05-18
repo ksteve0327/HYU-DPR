@@ -1,8 +1,6 @@
 # Patent DPR Retrieval
 
-This project was built to read and review the paper **Dense Passage Retrieval for Open-Domain Question Answering**, then directly implement its retriever training and Top-k retrieval evaluation pipeline on a custom Korean patent dataset.
-
-AI 시스템 반도체 특허 데이터를 DPR 논문 구조에 맞춰 변환하고, BM25와 DPR bi-encoder의 Top-k retrieval accuracy를 비교한 실험 프로젝트입니다.
+This project was built to read and review the paper **Dense Passage Retrieval for Open-Domain Question Answering**, then directly implement its retriever training and Top-k retrieval evaluation pipeline on a custom Korean & United States of America patent dataset.
 
 > 원본 특허 CSV, 생성된 DPR train/dev/test 데이터, passage corpus, checkpoint, embedding, 대용량 retrieval dump는 GitHub에 포함하지 않습니다.
 
