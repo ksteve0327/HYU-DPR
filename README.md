@@ -66,7 +66,6 @@ Excluded from git:
 
 - `patent_rawdata.csv`
 - `data/`
-- `kbo_raw_data/`
 - model checkpoints such as `dpr_biencoder.*`
 - dense embeddings such as `patent_passages_*`
 - full retrieval dumps such as `dpr_results.json`
