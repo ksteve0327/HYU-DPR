@@ -1,0 +1,49 @@
+# macOS and editor noise
+.DS_Store
+**/.DS_Store
+__pycache__/
+*.py[cod]
+*.log
+
+# Local environments and Hydra runtime folders
+.venv/
+venv/
+DPR-main/.venv-local/
+DPR-main/.hydra/
+DPR-main/outputs/
+
+# Source datasets and generated DPR data are intentionally excluded.
+# The patent CSV and derived train/dev/test/passages files may be large or non-public.
+patent_rawdata.csv
+/data/
+/kbo_raw_data/
+
+# Colab transfer bundles
+colab/HYU-DPR_colab_input.*
+*.tar.gz
+*.zip
+
+# Model checkpoints, dense embeddings, and large retrieval dumps
+outputs/**/*.pt
+outputs/**/dpr_biencoder*
+outputs/**/patent_passages*
+outputs/**/*results.json
+outputs/**/*_results.json
+outputs/**/*.json
+!outputs/**/run_metadata.json
+outputs/**/*.log
+outputs/patent_dpr_llm_judge/
+
+# Common secret and credential file names
+.env
+.env.*
+*.pem
+*.p12
+*secret*
+*credential*
+*.token
+*.tokens
+*access_token*
+*refresh_token*
+*auth_token*
+*api_key*

@@ -1,0 +1,2715 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>특허 데이터 기반 DPR Retrieval 실험 보고서</title>
+  <style>
+    :root {
+      --ink: #202124;
+      --muted: #5f6368;
+      --line: #d7dce2;
+      --surface: #f7f9fb;
+      --panel: #ffffff;
+      --bm25: #2563eb;
+      --dpr: #0f766e;
+      --warn-bg: #fff7e6;
+      --warn-line: #f3b13f;
+      --ok-bg: #eef7f1;
+      --ok-line: #64a876;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--surface);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Apple SD Gothic Neo", Arial, sans-serif;
+      line-height: 1.58;
+    }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 36px 24px 56px;
+    }
+
+    main.report-shell {
+      max-width: 1420px;
+      display: grid;
+      grid-template-columns: 230px minmax(0, 1120px);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .report-content {
+      min-width: 0;
+    }
+
+    .toc {
+      position: sticky;
+      top: 18px;
+      max-height: calc(100vh - 36px);
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+
+    .toc-title {
+      margin: 0 0 10px;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .toc a {
+      display: block;
+      padding: 5px 0;
+      color: #394150;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .toc a.sub {
+      padding-left: 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .toc-group {
+      padding: 7px 0;
+      border-top: 1px solid #eef2f7;
+    }
+
+    .toc-group:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    header {
+      margin-bottom: 28px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 32px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 36px 0 14px;
+      font-size: 22px;
+      line-height: 1.32;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 20px 0 10px;
+      font-size: 17px;
+      line-height: 1.35;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    code,
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    code {
+      font-size: 0.95em;
+      color: #23324d;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 12px 0 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre;
+    }
+
+    a {
+      color: #1d4ed8;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .subtitle {
+      max-width: 900px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: #394150;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .grid.cols-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 18px;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .metric-value {
+      margin-top: 4px;
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    .metric-note {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .callout {
+      border: 1px solid var(--warn-line);
+      border-radius: 8px;
+      background: var(--warn-bg);
+      padding: 14px 16px;
+    }
+
+    .callout.ok {
+      border-color: var(--ok-line);
+      background: var(--ok-bg);
+    }
+
+    .section-spacer {
+      margin-top: 18px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--line);
+      background: #fff;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: right;
+      vertical-align: top;
+    }
+
+    th:first-child,
+    td:first-child {
+      text-align: left;
+    }
+
+    th {
+      background: #eef2f7;
+      font-weight: 700;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .settings-table th,
+    .settings-table td {
+      text-align: left;
+    }
+
+    .settings-table td:first-child {
+      width: 220px;
+      font-weight: 600;
+      color: #394150;
+    }
+
+    .matrix-viz {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      gap: 14px;
+      margin: 16px 0;
+    }
+
+    .matrix-panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 16px;
+    }
+
+    .matrix-panel.wide {
+      grid-column: 1 / -1;
+    }
+
+    .embedding-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .embedding-item {
+      display: grid;
+      grid-template-columns: 48px 1fr 64px;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 10px;
+      border: 1px solid #dce3ea;
+      border-radius: 8px;
+      background: #fbfcfe;
+      font-size: 13px;
+    }
+
+    .embedding-item strong,
+    .embedding-item code {
+      white-space: nowrap;
+    }
+
+    .embedding-item.actual {
+      grid-template-columns: 48px 1fr 92px;
+      align-items: start;
+    }
+
+    .embedding-item.actual span {
+      line-height: 1.45;
+    }
+
+    .embedding-item.actual em {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-style: normal;
+      font-size: 12px;
+    }
+
+    .matrix-wrap {
+      overflow-x: auto;
+      margin-top: 10px;
+    }
+
+    .score-matrix {
+      min-width: 520px;
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .score-matrix th,
+    .score-matrix td {
+      min-width: 68px;
+      padding: 9px 10px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .score-matrix th:first-child {
+      min-width: 52px;
+      text-align: center;
+    }
+
+    .score-matrix .positive {
+      background: #def3e8;
+      color: #14532d;
+      font-weight: 700;
+    }
+
+    .score-matrix .inbatch {
+      background: #fff4d8;
+      color: #6b4e00;
+    }
+
+    .score-matrix .hard {
+      background: #fde7dd;
+      color: #7c2d12;
+    }
+
+    .score-matrix .omitted {
+      background: #f3f6f9;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend i {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+    }
+
+    .legend .pos {
+      background: #def3e8;
+    }
+
+    .legend .neg {
+      background: #fff4d8;
+    }
+
+    .legend .hn {
+      background: #fde7dd;
+    }
+
+    .tensor-flow {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) 42px minmax(0, 0.95fr) 42px minmax(0, 1.25fr);
+      gap: 10px;
+      align-items: center;
+      margin-top: 14px;
+    }
+
+    .operator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      font-weight: 700;
+      color: #394150;
+    }
+
+    .tensor-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 14px;
+    }
+
+    .tensor-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .tensor-title strong {
+      color: var(--ink);
+      font-size: 15px;
+    }
+
+    .tensor-rect {
+      position: relative;
+      min-height: 178px;
+      overflow: hidden;
+      border: 1px solid #cbd5df;
+      border-radius: 8px;
+      background-color: #fbfcfe;
+    }
+
+    .tensor-rect.q {
+      background:
+        repeating-linear-gradient(to bottom, rgba(15, 118, 110, 0.24) 0 2px, transparent 2px 10px),
+        repeating-linear-gradient(to right, rgba(15, 118, 110, 0.10) 0 1px, transparent 1px 18px),
+        #f4fbfa;
+    }
+
+    .tensor-rect.p {
+      background:
+        repeating-linear-gradient(to bottom, rgba(37, 99, 235, 0.18) 0 2px, transparent 2px 10px),
+        repeating-linear-gradient(to bottom, transparent 0 10px, rgba(220, 38, 38, 0.20) 10px 12px, transparent 12px 20px),
+        repeating-linear-gradient(to right, rgba(37, 99, 235, 0.08) 0 1px, transparent 1px 18px),
+        #f7fbff;
+    }
+
+    .tensor-rect.s {
+      min-height: 220px;
+      background:
+        repeating-linear-gradient(to right, rgba(253, 231, 221, 0.78) 0 6px, rgba(255, 244, 216, 0.82) 6px 12px),
+        repeating-linear-gradient(to bottom, rgba(107, 78, 0, 0.10) 0 1px, transparent 1px 12px),
+        #fffaf0;
+    }
+
+    .tensor-rect.s::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(116deg, transparent 0 47.8%, rgba(20, 83, 45, 0.72) 48.3% 50.3%, transparent 50.8% 100%);
+      pointer-events: none;
+    }
+
+    .axis-label {
+      position: absolute;
+      padding: 3px 7px;
+      border: 1px solid rgba(95, 99, 104, 0.20);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.88);
+      color: #394150;
+      font-size: 12px;
+      line-height: 1.3;
+      white-space: nowrap;
+    }
+
+    .axis-label.top {
+      top: 8px;
+      left: 8px;
+    }
+
+    .axis-label.bottom {
+      right: 8px;
+      bottom: 8px;
+    }
+
+    .target-index {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border: 1px solid #dce3ea;
+      border-radius: 8px;
+      background: #fbfcfe;
+      font-size: 13px;
+    }
+
+    .result-list {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .result-list li {
+      margin: 7px 0;
+    }
+
+    .result-list strong {
+      display: block;
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .result-list span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .hit-tag {
+      display: inline-block;
+      margin-left: 4px;
+      padding: 1px 6px;
+      border: 1px solid #b9dec9;
+      border-radius: 999px;
+      background: #def3e8;
+      color: #14532d;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .judge-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .judge-tag.supported {
+      border-color: #b9dec9;
+      background: #def3e8;
+      color: #14532d;
+    }
+
+    .judge-tag.partial {
+      border-color: #ead38b;
+      background: #fff4d8;
+      color: #6b4e00;
+    }
+
+    .judge-tag.unsupported {
+      border-color: #efc2b4;
+      background: #fde7dd;
+      color: #7c2d12;
+    }
+
+    .method-answer-list {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .method-answer-row {
+      display: grid;
+      grid-template-columns: minmax(132px, 0.75fr) minmax(210px, 1.2fr) minmax(210px, 1.2fr) minmax(118px, 0.55fr);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .method-answer-row:last-child {
+      border-bottom: 0;
+    }
+
+    .method-answer-row.header {
+      background: #eef2f7;
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .method-answer-cell {
+      padding: 10px 12px;
+      border-right: 1px solid var(--line);
+      color: #394150;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .method-answer-cell:last-child {
+      border-right: 0;
+    }
+
+    .method-answer-cell.method {
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .topk-answer-wrap {
+      margin-top: 10px;
+      overflow-x: auto;
+    }
+
+    .topk-answer-table {
+      min-width: 1180px;
+      font-size: 13px;
+    }
+
+    .topk-answer-table th,
+    .topk-answer-table td {
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .topk-answer-table .method-col {
+      width: 150px;
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .topk-answer-table .k-col {
+      width: 74px;
+      white-space: nowrap;
+    }
+
+    .topk-answer-table .rank-col {
+      width: 104px;
+      white-space: nowrap;
+    }
+
+    .topk-answer-table .answer-col {
+      min-width: 300px;
+    }
+
+    .topk-answer-table .evidence-col {
+      min-width: 330px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 150px 1fr 72px;
+      gap: 12px;
+      align-items: center;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+
+    .bar-track {
+      height: 14px;
+      border-radius: 999px;
+      background: #e6eaf0;
+      overflow: hidden;
+    }
+
+    .bar {
+      height: 100%;
+      border-radius: 999px;
+    }
+
+    .bar.bm25 {
+      background: var(--bm25);
+    }
+
+    .bar.dpr {
+      background: var(--dpr);
+    }
+
+    .line-plot-wrap {
+      overflow-x: auto;
+      margin-top: 12px;
+    }
+
+    .line-plot {
+      width: 100%;
+      min-width: 760px;
+      height: auto;
+      display: block;
+    }
+
+    .plot-grid {
+      stroke: #e5eaf0;
+      stroke-width: 1;
+    }
+
+    .plot-axis {
+      stroke: #7b8490;
+      stroke-width: 1.2;
+    }
+
+    .plot-label {
+      fill: var(--muted);
+      font-size: 12px;
+    }
+
+    .plot-value {
+      fill: #202124;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .plot-line {
+      fill: none;
+      stroke-width: 2.6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .plot-point {
+      stroke: #fff;
+      stroke-width: 2;
+    }
+
+    .plot-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .plot-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .plot-legend i {
+      display: inline-block;
+      width: 18px;
+      height: 3px;
+      border-radius: 999px;
+    }
+
+    .vector-overview {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin: 16px 0 20px;
+    }
+
+    .vector-card img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .vector-card h4 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      line-height: 1.35;
+    }
+
+    .vector-caption {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .step {
+      min-height: 94px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .step span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .list {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .list li {
+      margin: 6px 0;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    footer {
+      margin-top: 34px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        padding: 26px 16px 44px;
+      }
+
+      main.report-shell {
+        max-width: 1120px;
+        display: block;
+      }
+
+      .toc {
+        position: static;
+        max-height: none;
+        margin-bottom: 18px;
+      }
+
+      .toc-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 12px;
+      }
+
+      h1 {
+        font-size: 26px;
+      }
+
+      .grid.cols-3,
+      .grid.cols-2,
+      .matrix-viz,
+      .flow,
+      .vector-overview,
+      .tensor-flow {
+        grid-template-columns: 1fr;
+      }
+
+      .matrix-panel.wide {
+        grid-column: auto;
+      }
+
+      .bar-row {
+        grid-template-columns: 112px 1fr 58px;
+      }
+
+      .method-answer-row {
+        grid-template-columns: 1fr;
+      }
+
+      .method-answer-cell {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .method-answer-cell:last-child {
+        border-bottom: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="report-shell">
+    <nav class="toc" aria-label="보고서 목차">
+      <div class="toc-title">목차</div>
+      <div class="toc-group">
+        <a href="#summary">1. 실험 요약</a>
+        <a class="sub" href="#run-conditions">DPR run 조건</a>
+        <a class="sub" href="#passage-columns">Passage 컬럼</a>
+      </div>
+      <div class="toc-group">
+        <a href="#retrieval-accuracy">2. Retrieval Accuracy</a>
+        <a class="sub" href="#accuracy-lineplot">Top-k line plot</a>
+        <a class="sub" href="#dpr-only-lineplot">DPR-only plot</a>
+      </div>
+      <div class="toc-group">
+        <a href="#examples">3. 실험 예시</a>
+        <a class="sub" href="#question-examples">실제 질문 예시</a>
+        <a class="sub" href="#vector-space">Vector space</a>
+        <a class="sub" href="#example-a">예시 A</a>
+        <a class="sub" href="#example-b">예시 B</a>
+        <a class="sub" href="#example-c">예시 C</a>
+        <a class="sub" href="#example-d">예시 D</a>
+      </div>
+      <div class="toc-group">
+        <a href="#data-transform">4. 데이터 변환 방식</a>
+        <a href="#dpr-training">5. DPR 학습 구조</a>
+        <a class="sub" href="#q-matrix">Q 행렬 / In-batch</a>
+        <a class="sub" href="#qps-viz">Q/P/S 전체 시각화</a>
+      </div>
+      <div class="toc-group">
+        <a href="#interpretation">6. 현재 결과 해석</a>
+        <a href="#finetuning-log">7. Fine-tuning 기록</a>
+        <a href="#colab-record">8. Colab Pro 기록</a>
+      </div>
+    </nav>
+    <div class="report-content">
+    <header>
+      <h1>특허 데이터 기반 DPR Retrieval 실험 보고서</h1>
+      <p class="subtitle">
+        AI 시스템 반도체 특허 CSV를 DPR 논문 구조에 맞춰 passage retrieval 문제로 변환하고,
+        BM25와 DPR bi-encoder retrieval 성능을 gold patent_id hit rate 기준으로 비교했다.
+      </p>
+      <div class="meta">
+        <span class="pill">작성일: 2026-05-17</span>
+        <span class="pill">데이터: patent_rawdata.csv</span>
+        <span class="pill">평가: Top-5 / Top-10 / Top-20 / Top-50 / Top-100</span>
+        <span class="pill">기준: gold patent_id hit</span>
+      </div>
+    </header>
+
+    <section class="callout">
+      <strong>현재 보고서의 DPR 값 표기 기준</strong>
+      <p>
+        본 보고서는 <strong>파인튜닝 전 DPR</strong>을 별도로 실행해 <code>DPR zero-shot</code> 기준선으로 기록했다.
+        로컬 Apple Silicon에서 검증용으로 수행한 <code>1% sampled local fine-tuning</code> 결과는
+        초기 fine-tuning 관측치로 분리했다. 전체 train split으로 1 epoch fine-tuning한 결과는
+        <code>DPR full fine-tuned</code> 행에 반영했다. Colab Pro A100 run은 현재 로컬에 확보된
+        checkpoint 중 dev NLL 기준 최선인 <code>dpr_biencoder.1</code>을 우선 평가해
+        <code>DPR Colab Pro checkpoint 1</code> 행으로 추가했다.
+      </p>
+    </section>
+
+    <section class="callout section-spacer">
+      <strong>Gold label 및 평가 기준</strong>
+      <p>
+        본 실험은 DPR 논문의 retriever 학습 구조와 Top-k retrieval evaluation을 따른다.
+        다만 원 논문의 gold answer는 사람이 라벨링한 QA answer string인 반면,
+        본 특허 데이터에는 human-labeled QA가 없으므로 gold label은 <code>patent_id</code> 기준으로 정의했다.
+        따라서 정답 판정은 answer exact match가 아니라 동일 특허 passage 검색 성공 여부로 계산한다.
+      </p>
+    </section>
+
+    <h2 id="summary">1. 실험 요약</h2>
+    <div class="grid cols-3">
+      <div class="card">
+        <div class="metric-label">Passage corpus</div>
+        <div class="metric-value">30,809</div>
+        <div class="metric-note">6,645개 특허의 <code>graphrag_text</code>를 140-token chunk로 분할</div>
+      </div>
+      <div class="card">
+        <div class="metric-label">Train / Dev / Test queries</div>
+        <div class="metric-value">15,948 / 1,992 / 1,995</div>
+        <div class="metric-note">80 / 10 / 10 split, 특허 기준 5,316 / 664 / 665개</div>
+      </div>
+      <div class="card">
+        <div class="metric-label">Test patents</div>
+        <div class="metric-value">665</div>
+        <div class="metric-note">질문 유형별 665개씩 평가</div>
+      </div>
+    </div>
+
+    <div class="callout section-spacer">
+      <strong>Split 비율 선택 이유</strong>
+      <p>
+        <code>80/10/10</code>은 DPR 논문이 고정한 비율이 아니라, 이 특허 CSV에 공식 benchmark split이 없어서 적용한 실험 설계다.
+        DPR 논문은 Natural Questions, TriviaQA 등 기존 QA 데이터셋의 train/dev/test split을 사용해 평가한다.
+        따라서 본 실험에서는 논문 구조인 bi-encoder, in-batch negative, hard negative, Top-k retrieval 평가는 따르되,
+        데이터 분할은 특허 단위로 새로 만들었다. 같은 특허가 train과 test에 동시에 들어가는 leakage를 막기 위해
+        query 단위가 아니라 <code>patent_id</code> 단위로 먼저 나눈 뒤, 각 특허에서 목적/해결수단/목적+솔루션 질문을 생성했다.
+      </p>
+    </div>
+
+    <h3 id="run-conditions">DPR run별 실험 조건 요약</h3>
+    <table class="settings-table" aria-label="DPR run settings summary">
+      <tbody>
+        <tr>
+          <th>Run</th>
+          <th>학습 데이터</th>
+          <th>Batch / Epoch</th>
+          <th>Negatives</th>
+          <th>평가 checkpoint / 비고</th>
+        </tr>
+        <tr>
+          <td>DPR zero-shot</td>
+          <td>파인튜닝 없음</td>
+          <td>-</td>
+          <td>-</td>
+          <td><code>bert-base-multilingual-cased</code> 초기 encoder로 전체 <code>passages.tsv</code> embedding 생성 후 test 1,995 queries 평가</td>
+        </tr>
+        <tr>
+          <td>DPR 1% sampled fine-tuned</td>
+          <td>train split 약 1%</td>
+          <td><code>batch=2</code>, <code>epoch=1</code>, grad acc <code>1</code></td>
+          <td><code>hard_negatives=1</code></td>
+          <td>로컬 Apple Silicon/MPS smoke run. 성능 확인용 sampled checkpoint</td>
+        </tr>
+        <tr>
+          <td>DPR full local</td>
+          <td>전체 train split <code>15,948</code> queries</td>
+          <td><code>batch=2</code>, <code>dev batch=4</code>, <code>epoch=1</code>, grad acc <code>1</code></td>
+          <td><code>hard_negatives=1</code></td>
+          <td><code>outputs/patent_dpr_local_full/dpr_biencoder.0</code>. 로컬 MPS 제약 때문에 작은 batch 사용</td>
+        </tr>
+        <tr>
+          <td>DPR Colab Pro checkpoint 1</td>
+          <td>전체 train split <code>15,948</code> queries</td>
+          <td><code>batch=128</code>, effective <code>128</code>, <code>epoch=40</code>, grad acc <code>1</code></td>
+          <td><code>hard_negatives=1</code></td>
+          <td>A100 80GB, <code>sequence_length=256</code>, <code>fp16=False</code>. 로컬 확보 checkpoint 0-4 중 dev NLL 기준 최선인 <code>dpr_biencoder.1</code> 평가</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 id="passage-columns">Passage corpus에 들어간 컬럼</h3>
+    <p>
+      DPR의 <code>passages.tsv</code>는 <code>id TAB text TAB title</code> 형식이다.
+      이 실험에서 <code>id</code>는 <code>patent_id::chunk_xxx</code>, <code>title</code>은
+      원본 CSV의 <code>발명의 명칭</code>, <code>text</code>는 <code>graphrag_text</code>를 chunking한 값이다.
+      질문/정답 생성에는 별도로 <code>AI요약(목적)</code>, <code>AI요약(솔루션)</code>,
+      <code>AI요약(목적+솔루션)</code>을 사용했다. 즉 passage는 명칭만 쓴 것이 아니라,
+      명칭은 title field로 들어가고 본문은 <code>graphrag_text</code> 전체를 사용했다.
+    </p>
+    <table class="settings-table" aria-label="passage corpus columns">
+      <tbody>
+        <tr>
+          <th>DPR field</th>
+          <th>원본 CSV 컬럼 / 포함 내용</th>
+        </tr>
+        <tr>
+          <td><code>id</code></td>
+          <td><code>patent_id</code> 기반. 예: <code>2025-0016785::chunk_000</code></td>
+        </tr>
+        <tr>
+          <td><code>title</code></td>
+          <td><code>발명의 명칭</code>. DPR context encoder는 title insertion을 켜서 title과 text를 함께 인코딩한다.</td>
+        </tr>
+        <tr>
+          <td><code>text</code></td>
+          <td><code>graphrag_text</code>. 내부에는 특허ID, 발명의 명칭, 중분류/소분류, IPC/CPC, 출원인/권리자, 국가/국적, 출원일/출원연도, 법적상태, 기술 목적, 해결수단, 목적+솔루션 요약, 요약, 대표청구항, 국책과제 정보가 라벨 형태로 포함된다.</td>
+        </tr>
+        <tr>
+          <td>QA answer source</td>
+          <td><code>AI요약(목적)</code>, <code>AI요약(솔루션)</code>, <code>AI요약(목적+솔루션)</code>. 이 컬럼들은 passage 파일의 별도 column은 아니고, train/dev/test query의 정답 문장 생성에 사용했다.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2 id="retrieval-accuracy">2. Table 2 형태의 Retrieval Accuracy</h2>
+    <table aria-label="BM25 DPR retrieval accuracy">
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>Top-5</th>
+          <th>Top-10</th>
+          <th>Top-20</th>
+          <th>Top-50</th>
+          <th>Top-100</th>
+          <th>비고</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>BM25</td>
+          <td>92.18</td>
+          <td>94.94</td>
+          <td>96.24</td>
+          <td>97.74</td>
+          <td>98.65</td>
+          <td>동일 corpus, 동일 test split</td>
+        </tr>
+        <tr>
+          <td>DPR zero-shot</td>
+          <td>0.10</td>
+          <td>0.25</td>
+          <td>0.45</td>
+          <td>1.00</td>
+          <td>2.56</td>
+          <td>파인튜닝 전 pretrained mBERT bi-encoder</td>
+        </tr>
+        <tr>
+          <td>DPR 1% sampled fine-tuned</td>
+          <td>0.20</td>
+          <td>0.60</td>
+          <td>1.00</td>
+          <td>2.66</td>
+          <td>5.56</td>
+          <td>로컬 MPS 검증용 1% sampling run</td>
+        </tr>
+        <tr>
+          <td>DPR full fine-tuned</td>
+          <td>87.22</td>
+          <td>91.88</td>
+          <td>95.99</td>
+          <td>98.60</td>
+          <td>99.40</td>
+          <td>전체 train split, 1 epoch local run</td>
+        </tr>
+        <tr>
+          <td>DPR Colab Pro checkpoint 1</td>
+          <td>98.30</td>
+          <td>99.10</td>
+          <td>99.55</td>
+          <td>99.90</td>
+          <td>100.00</td>
+          <td>A100 actual batch 128, 확보 checkpoint 0-4 중 dev NLL 최선</td>
+        </tr>
+        <tr>
+          <td>BM25+DPR Colab RRF</td>
+          <td>98.40</td>
+          <td>99.25</td>
+          <td>99.55</td>
+          <td>99.90</td>
+          <td>100.00</td>
+          <td>BM25와 DPR Colab Pro checkpoint 1을 weighted RRF로 결합, DPR weight α=0.9</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="small">
+      수치는 held-out test split 1,995 queries에 대해 Top-k 안에 같은 <code>patent_id</code>의 passage가
+      하나라도 있으면 hit로 계산한 accuracy다. BM25+DPR은 새 학습 없이 BM25 rank와 DPR Colab rank를 결합한 rank fusion 결과다.
+      따라서 <code>Top-100 = 100%</code>는 모든 Top-100 passage가 정답이라는 뜻이 아니라,
+      모든 test query에서 Top-100 안에 정답 특허 passage가 최소 1개 이상 들어갔다는 뜻이다.
+    </p>
+
+    <div class="card" style="margin-top: 16px;">
+      <h3 id="accuracy-lineplot">Top-k Retrieval Accuracy Line Plot</h3>
+      <div class="line-plot-wrap">
+        <svg class="line-plot" viewBox="0 0 860 420" role="img" aria-label="Top-k retrieval accuracy line plot">
+          <line class="plot-grid" x1="90" y1="40" x2="760" y2="40"></line>
+          <line class="plot-grid" x1="90" y1="112.5" x2="760" y2="112.5"></line>
+          <line class="plot-grid" x1="90" y1="185" x2="760" y2="185"></line>
+          <line class="plot-grid" x1="90" y1="257.5" x2="760" y2="257.5"></line>
+          <line class="plot-grid" x1="90" y1="330" x2="760" y2="330"></line>
+          <line class="plot-axis" x1="90" y1="40" x2="90" y2="330"></line>
+          <line class="plot-axis" x1="90" y1="330" x2="760" y2="330"></line>
+          <text class="plot-label" x="64" y="334" text-anchor="end">0</text>
+          <text class="plot-label" x="64" y="261.5" text-anchor="end">25</text>
+          <text class="plot-label" x="64" y="189" text-anchor="end">50</text>
+          <text class="plot-label" x="64" y="116.5" text-anchor="end">75</text>
+          <text class="plot-label" x="64" y="44" text-anchor="end">100</text>
+          <text class="plot-label" x="26" y="185" text-anchor="middle" transform="rotate(-90 26 185)">Accuracy (%)</text>
+          <text class="plot-label" x="120" y="360" text-anchor="middle">Top-5</text>
+          <text class="plot-label" x="270" y="360" text-anchor="middle">Top-10</text>
+          <text class="plot-label" x="420" y="360" text-anchor="middle">Top-20</text>
+          <text class="plot-label" x="570" y="360" text-anchor="middle">Top-50</text>
+          <text class="plot-label" x="720" y="360" text-anchor="middle">Top-100</text>
+
+          <polyline class="plot-line" stroke="#2563eb" points="120,62.68 270,54.67 420,50.90 570,46.55 720,43.92"></polyline>
+          <polyline class="plot-line" stroke="#9ca3af" points="120,329.71 270,329.27 420,328.69 570,327.10 720,322.58"></polyline>
+          <polyline class="plot-line" stroke="#f59e0b" points="120,329.42 270,328.26 420,327.10 570,322.29 720,313.88"></polyline>
+          <polyline class="plot-line" stroke="#0f766e" points="120,77.06 270,63.55 420,51.63 570,44.06 720,41.74"></polyline>
+          <polyline class="plot-line" stroke="#dc2626" points="120,44.93 270,42.61 420,41.31 570,40.29 720,40.00"></polyline>
+          <polyline class="plot-line" stroke="#7c3aed" points="120,44.64 270,42.18 420,41.31 570,40.29 720,40.00"></polyline>
+          <circle class="plot-point" fill="#2563eb" cx="120" cy="62.68" r="4"></circle>
+          <circle class="plot-point" fill="#2563eb" cx="270" cy="54.67" r="4"></circle>
+          <circle class="plot-point" fill="#2563eb" cx="420" cy="50.90" r="4"></circle>
+          <circle class="plot-point" fill="#2563eb" cx="570" cy="46.55" r="4"></circle>
+          <circle class="plot-point" fill="#2563eb" cx="720" cy="43.92" r="4"></circle>
+          <circle class="plot-point" fill="#9ca3af" cx="120" cy="329.71" r="4"></circle>
+          <circle class="plot-point" fill="#9ca3af" cx="270" cy="329.27" r="4"></circle>
+          <circle class="plot-point" fill="#9ca3af" cx="420" cy="328.69" r="4"></circle>
+          <circle class="plot-point" fill="#9ca3af" cx="570" cy="327.10" r="4"></circle>
+          <circle class="plot-point" fill="#9ca3af" cx="720" cy="322.58" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="120" cy="329.42" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="270" cy="328.26" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="420" cy="327.10" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="570" cy="322.29" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="720" cy="313.88" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="120" cy="77.06" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="270" cy="63.55" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="420" cy="51.63" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="570" cy="44.06" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="720" cy="41.74" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="120" cy="44.93" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="270" cy="42.61" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="420" cy="41.31" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="570" cy="40.29" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="720" cy="40.00" r="4"></circle>
+          <circle class="plot-point" fill="#7c3aed" cx="120" cy="44.64" r="4"></circle>
+          <circle class="plot-point" fill="#7c3aed" cx="270" cy="42.18" r="4"></circle>
+          <circle class="plot-point" fill="#7c3aed" cx="420" cy="41.31" r="4"></circle>
+          <circle class="plot-point" fill="#7c3aed" cx="570" cy="40.29" r="4"></circle>
+          <circle class="plot-point" fill="#7c3aed" cx="720" cy="40.00" r="4"></circle>
+
+          <text class="plot-value" x="128" y="55.68">92.18</text>
+          <text class="plot-value" x="278" y="47.67">94.94</text>
+          <text class="plot-value" x="428" y="43.90">96.24</text>
+          <text class="plot-value" x="578" y="39.55">97.74</text>
+          <text class="plot-value" x="728" y="36.92">98.65</text>
+          <text class="plot-value" x="128" y="322.71">0.10</text>
+          <text class="plot-value" x="278" y="322.27">0.25</text>
+          <text class="plot-value" x="428" y="321.69">0.45</text>
+          <text class="plot-value" x="578" y="320.10">1.00</text>
+          <text class="plot-value" x="728" y="315.58">2.56</text>
+          <text class="plot-value" x="128" y="322.42">0.20</text>
+          <text class="plot-value" x="278" y="321.26">0.60</text>
+          <text class="plot-value" x="428" y="320.10">1.00</text>
+          <text class="plot-value" x="578" y="315.29">2.66</text>
+          <text class="plot-value" x="728" y="306.88">5.56</text>
+          <text class="plot-value" x="128" y="70.06">87.22</text>
+          <text class="plot-value" x="278" y="56.55">91.88</text>
+          <text class="plot-value" x="428" y="44.63">95.99</text>
+          <text class="plot-value" x="578" y="37.06">98.60</text>
+          <text class="plot-value" x="728" y="34.74">99.40</text>
+          <text class="plot-value" x="128" y="37.93">98.30</text>
+          <text class="plot-value" x="278" y="35.61">99.10</text>
+          <text class="plot-value" x="428" y="34.31">99.55</text>
+          <text class="plot-value" x="578" y="33.29">99.90</text>
+          <text class="plot-value" x="728" y="33.00">100.00</text>
+          <text class="plot-value" x="128" y="37.64">98.40</text>
+          <text class="plot-value" x="278" y="35.18">99.25</text>
+          <text class="plot-value" x="428" y="34.31">99.55</text>
+          <text class="plot-value" x="578" y="33.29">99.90</text>
+          <text class="plot-value" x="728" y="33.00">100.00</text>
+        </svg>
+      </div>
+      <div class="plot-legend">
+        <span><i style="background:#2563eb;"></i>BM25</span>
+        <span><i style="background:#9ca3af;"></i>DPR zero-shot</span>
+        <span><i style="background:#f59e0b;"></i>DPR 1% sampled</span>
+        <span><i style="background:#0f766e;"></i>DPR full local</span>
+        <span><i style="background:#dc2626;"></i>DPR Colab Pro checkpoint 1</span>
+        <span><i style="background:#7c3aed;"></i>BM25+DPR RRF alpha=0.9</span>
+      </div>
+      <p class="small" style="margin-top: 10px;">BM25+DPR RRF는 Top-5에서 DPR Colab Pro checkpoint 1보다 +0.10 point 높고, Top-50부터 99.90% 이상에 도달한다.</p>
+    </div>
+
+    <div class="card" style="margin-top: 16px;">
+      <h3 id="dpr-only-lineplot">DPR-only Top-k Retrieval Accuracy Line Plot</h3>
+      <div class="line-plot-wrap">
+        <svg class="line-plot" viewBox="0 0 860 420" role="img" aria-label="DPR-only Top-k retrieval accuracy line plot">
+          <line class="plot-grid" x1="90" y1="40" x2="760" y2="40"></line>
+          <line class="plot-grid" x1="90" y1="112.5" x2="760" y2="112.5"></line>
+          <line class="plot-grid" x1="90" y1="185" x2="760" y2="185"></line>
+          <line class="plot-grid" x1="90" y1="257.5" x2="760" y2="257.5"></line>
+          <line class="plot-grid" x1="90" y1="330" x2="760" y2="330"></line>
+          <line class="plot-axis" x1="90" y1="40" x2="90" y2="330"></line>
+          <line class="plot-axis" x1="90" y1="330" x2="760" y2="330"></line>
+          <text class="plot-label" x="64" y="334" text-anchor="end">0</text>
+          <text class="plot-label" x="64" y="261.5" text-anchor="end">25</text>
+          <text class="plot-label" x="64" y="189" text-anchor="end">50</text>
+          <text class="plot-label" x="64" y="116.5" text-anchor="end">75</text>
+          <text class="plot-label" x="64" y="44" text-anchor="end">100</text>
+          <text class="plot-label" x="26" y="185" text-anchor="middle" transform="rotate(-90 26 185)">Accuracy (%)</text>
+          <text class="plot-label" x="120" y="360" text-anchor="middle">Top-5</text>
+          <text class="plot-label" x="270" y="360" text-anchor="middle">Top-10</text>
+          <text class="plot-label" x="420" y="360" text-anchor="middle">Top-20</text>
+          <text class="plot-label" x="570" y="360" text-anchor="middle">Top-50</text>
+          <text class="plot-label" x="720" y="360" text-anchor="middle">Top-100</text>
+
+          <polyline class="plot-line" stroke="#9ca3af" points="120,329.71 270,329.27 420,328.69 570,327.10 720,322.58"></polyline>
+          <polyline class="plot-line" stroke="#f59e0b" points="120,329.42 270,328.26 420,327.10 570,322.29 720,313.88"></polyline>
+          <polyline class="plot-line" stroke="#0f766e" points="120,77.06 270,63.55 420,51.63 570,44.06 720,41.74"></polyline>
+          <polyline class="plot-line" stroke="#dc2626" points="120,44.93 270,42.61 420,41.31 570,40.29 720,40.00"></polyline>
+          <circle class="plot-point" fill="#9ca3af" cx="120" cy="329.71" r="4"></circle>
+          <circle class="plot-point" fill="#9ca3af" cx="270" cy="329.27" r="4"></circle>
+          <circle class="plot-point" fill="#9ca3af" cx="420" cy="328.69" r="4"></circle>
+          <circle class="plot-point" fill="#9ca3af" cx="570" cy="327.10" r="4"></circle>
+          <circle class="plot-point" fill="#9ca3af" cx="720" cy="322.58" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="120" cy="329.42" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="270" cy="328.26" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="420" cy="327.10" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="570" cy="322.29" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="720" cy="313.88" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="120" cy="77.06" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="270" cy="63.55" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="420" cy="51.63" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="570" cy="44.06" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="720" cy="41.74" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="120" cy="44.93" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="270" cy="42.61" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="420" cy="41.31" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="570" cy="40.29" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="720" cy="40.00" r="4"></circle>
+
+          <text class="plot-value" x="128" y="322.71">0.10</text>
+          <text class="plot-value" x="278" y="322.27">0.25</text>
+          <text class="plot-value" x="428" y="321.69">0.45</text>
+          <text class="plot-value" x="578" y="320.10">1.00</text>
+          <text class="plot-value" x="728" y="315.58">2.56</text>
+          <text class="plot-value" x="128" y="322.42">0.20</text>
+          <text class="plot-value" x="278" y="321.26">0.60</text>
+          <text class="plot-value" x="428" y="320.10">1.00</text>
+          <text class="plot-value" x="578" y="315.29">2.66</text>
+          <text class="plot-value" x="728" y="306.88">5.56</text>
+          <text class="plot-value" x="128" y="70.06">87.22</text>
+          <text class="plot-value" x="278" y="56.55">91.88</text>
+          <text class="plot-value" x="428" y="44.63">95.99</text>
+          <text class="plot-value" x="578" y="37.06">98.60</text>
+          <text class="plot-value" x="728" y="34.74">99.40</text>
+          <text class="plot-value" x="128" y="37.93">98.30</text>
+          <text class="plot-value" x="278" y="35.61">99.10</text>
+          <text class="plot-value" x="428" y="34.31">99.55</text>
+          <text class="plot-value" x="578" y="33.29">99.90</text>
+          <text class="plot-value" x="728" y="33.00">100.00</text>
+        </svg>
+      </div>
+      <div class="plot-legend">
+        <span><i style="background:#9ca3af;"></i>DPR zero-shot</span>
+        <span><i style="background:#f59e0b;"></i>DPR 1% sampled</span>
+        <span><i style="background:#0f766e;"></i>DPR full local</span>
+        <span><i style="background:#dc2626;"></i>DPR Colab Pro checkpoint 1</span>
+      </div>
+      <p class="small" style="margin-top: 10px;">같은 0-100% y축을 사용했다. DPR 내부 비교만 보면 full local에서 retrieval objective가 크게 학습되고, Colab Pro checkpoint 1에서 Top-5까지 98% 이상으로 올라간다.</p>
+    </div>
+
+    <div class="card" style="margin-top: 16px;">
+      <h3>DPR 초기 단계 비교: zero-shot vs 1% sampled</h3>
+      <div class="line-plot-wrap">
+        <svg class="line-plot" viewBox="0 0 860 420" role="img" aria-label="DPR zero-shot and 1 percent sampled line plot">
+          <line class="plot-grid" x1="90" y1="40" x2="760" y2="40"></line>
+          <line class="plot-grid" x1="90" y1="112.5" x2="760" y2="112.5"></line>
+          <line class="plot-grid" x1="90" y1="185" x2="760" y2="185"></line>
+          <line class="plot-grid" x1="90" y1="257.5" x2="760" y2="257.5"></line>
+          <line class="plot-grid" x1="90" y1="330" x2="760" y2="330"></line>
+          <line class="plot-axis" x1="90" y1="40" x2="90" y2="330"></line>
+          <line class="plot-axis" x1="90" y1="330" x2="760" y2="330"></line>
+          <text class="plot-label" x="64" y="334" text-anchor="end">0</text>
+          <text class="plot-label" x="64" y="261.5" text-anchor="end">1.5</text>
+          <text class="plot-label" x="64" y="189" text-anchor="end">3.0</text>
+          <text class="plot-label" x="64" y="116.5" text-anchor="end">4.5</text>
+          <text class="plot-label" x="64" y="44" text-anchor="end">6.0</text>
+          <text class="plot-label" x="26" y="185" text-anchor="middle" transform="rotate(-90 26 185)">Accuracy (%)</text>
+          <text class="plot-label" x="120" y="360" text-anchor="middle">Top-5</text>
+          <text class="plot-label" x="270" y="360" text-anchor="middle">Top-10</text>
+          <text class="plot-label" x="420" y="360" text-anchor="middle">Top-20</text>
+          <text class="plot-label" x="570" y="360" text-anchor="middle">Top-50</text>
+          <text class="plot-label" x="720" y="360" text-anchor="middle">Top-100</text>
+
+          <polyline class="plot-line" stroke="#9ca3af" points="120,325.17 270,317.92 420,308.25 570,281.67 720,206.27"></polyline>
+          <polyline class="plot-line" stroke="#f59e0b" points="120,320.33 270,301.00 420,281.67 570,201.43 720,61.27"></polyline>
+          <circle class="plot-point" fill="#9ca3af" cx="120" cy="325.17" r="4"></circle>
+          <circle class="plot-point" fill="#9ca3af" cx="270" cy="317.92" r="4"></circle>
+          <circle class="plot-point" fill="#9ca3af" cx="420" cy="308.25" r="4"></circle>
+          <circle class="plot-point" fill="#9ca3af" cx="570" cy="281.67" r="4"></circle>
+          <circle class="plot-point" fill="#9ca3af" cx="720" cy="206.27" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="120" cy="320.33" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="270" cy="301.00" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="420" cy="281.67" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="570" cy="201.43" r="4"></circle>
+          <circle class="plot-point" fill="#f59e0b" cx="720" cy="61.27" r="4"></circle>
+
+          <text class="plot-value" x="128" y="318.17">0.10</text>
+          <text class="plot-value" x="278" y="310.92">0.25</text>
+          <text class="plot-value" x="428" y="301.25">0.45</text>
+          <text class="plot-value" x="578" y="274.67">1.00</text>
+          <text class="plot-value" x="728" y="199.27">2.56</text>
+          <text class="plot-value" x="128" y="340.33">0.20</text>
+          <text class="plot-value" x="278" y="321.00">0.60</text>
+          <text class="plot-value" x="428" y="274.67">1.00</text>
+          <text class="plot-value" x="578" y="194.43">2.66</text>
+          <text class="plot-value" x="728" y="54.27">5.56</text>
+        </svg>
+      </div>
+      <div class="plot-legend">
+        <span><i style="background:#9ca3af;"></i>DPR zero-shot</span>
+        <span><i style="background:#f59e0b;"></i>DPR 1% sampled</span>
+      </div>
+      <p class="small" style="margin-top: 10px;">이 그래프는 차이를 보기 위해 y축을 <code>0-6%</code>로 확대했다. 1% sampled fine-tuning은 zero-shot보다 개선되지만, 아직 retrieval objective를 충분히 학습하지 못한 상태다.</p>
+    </div>
+
+    <div class="card" style="margin-top: 16px;">
+      <h3>DPR 본 학습 비교: full local vs Colab Pro checkpoint 1</h3>
+      <div class="line-plot-wrap">
+        <svg class="line-plot" viewBox="0 0 860 420" role="img" aria-label="DPR full local and Colab Pro checkpoint 1 line plot">
+          <line class="plot-grid" x1="90" y1="40" x2="760" y2="40"></line>
+          <line class="plot-grid" x1="90" y1="112.5" x2="760" y2="112.5"></line>
+          <line class="plot-grid" x1="90" y1="185" x2="760" y2="185"></line>
+          <line class="plot-grid" x1="90" y1="257.5" x2="760" y2="257.5"></line>
+          <line class="plot-grid" x1="90" y1="330" x2="760" y2="330"></line>
+          <line class="plot-axis" x1="90" y1="40" x2="90" y2="330"></line>
+          <line class="plot-axis" x1="90" y1="330" x2="760" y2="330"></line>
+          <text class="plot-label" x="64" y="334" text-anchor="end">80</text>
+          <text class="plot-label" x="64" y="261.5" text-anchor="end">85</text>
+          <text class="plot-label" x="64" y="189" text-anchor="end">90</text>
+          <text class="plot-label" x="64" y="116.5" text-anchor="end">95</text>
+          <text class="plot-label" x="64" y="44" text-anchor="end">100</text>
+          <text class="plot-label" x="26" y="185" text-anchor="middle" transform="rotate(-90 26 185)">Accuracy (%)</text>
+          <text class="plot-label" x="120" y="360" text-anchor="middle">Top-5</text>
+          <text class="plot-label" x="270" y="360" text-anchor="middle">Top-10</text>
+          <text class="plot-label" x="420" y="360" text-anchor="middle">Top-20</text>
+          <text class="plot-label" x="570" y="360" text-anchor="middle">Top-50</text>
+          <text class="plot-label" x="720" y="360" text-anchor="middle">Top-100</text>
+
+          <polyline class="plot-line" stroke="#0f766e" points="120,225.31 270,157.74 420,98.15 570,60.30 720,48.70"></polyline>
+          <polyline class="plot-line" stroke="#dc2626" points="120,64.65 270,53.05 420,46.53 570,41.45 720,40.00"></polyline>
+          <circle class="plot-point" fill="#0f766e" cx="120" cy="225.31" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="270" cy="157.74" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="420" cy="98.15" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="570" cy="60.30" r="4"></circle>
+          <circle class="plot-point" fill="#0f766e" cx="720" cy="48.70" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="120" cy="64.65" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="270" cy="53.05" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="420" cy="46.53" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="570" cy="41.45" r="4"></circle>
+          <circle class="plot-point" fill="#dc2626" cx="720" cy="40.00" r="4"></circle>
+
+          <text class="plot-value" x="128" y="243.31">87.22</text>
+          <text class="plot-value" x="278" y="175.74">91.88</text>
+          <text class="plot-value" x="428" y="116.15">95.99</text>
+          <text class="plot-value" x="578" y="78.30">98.60</text>
+          <text class="plot-value" x="728" y="66.70">99.40</text>
+          <text class="plot-value" x="128" y="57.65">98.30</text>
+          <text class="plot-value" x="278" y="46.05">99.10</text>
+          <text class="plot-value" x="428" y="39.53">99.55</text>
+          <text class="plot-value" x="578" y="34.45">99.90</text>
+          <text class="plot-value" x="728" y="33.00">100.00</text>
+        </svg>
+      </div>
+      <div class="plot-legend">
+        <span><i style="background:#0f766e;"></i>DPR full local</span>
+        <span><i style="background:#dc2626;"></i>DPR Colab Pro checkpoint 1</span>
+      </div>
+      <p class="small" style="margin-top: 10px;">이 그래프는 차이를 보기 위해 y축을 <code>80-100%</code>로 확대했다. Colab Pro checkpoint 1은 특히 Top-5에서 local full 대비 <code>+11.08</code> point 높다.</p>
+    </div>
+
+    <h2 id="examples">3. 실험 예시</h2>
+    <p>
+      아래 예시는 실제 test split에서 가져온 query다. 평가는 생성형 답변의 exact match가 아니라,
+      검색된 Top-k passage 중 같은 <code>gold patent_id</code>를 가진 passage가 하나라도 있으면 hit로 계산한다.
+      각 예시는 본문에서 query, 정답, Top-k hit 여부를 제시하고, method × Top-k 조합의 실제 passage 목록은 별도 상세 페이지에 예시별 30개 행씩 분리했다.
+      예를 들어 BM25+DPR Colab RRF Top-100에서 예시 A는 100개 중 정답 특허 chunk가 5개,
+      예시 B는 4개이며, 예시 C/D도 같은 방식으로 하나 이상의 gold passage가 있으면 <code>Top-100 hit</code>로 계산된다.
+    </p>
+    <div class="callout">
+      <strong>예시의 정답 특허와 정답 답변 출처</strong>
+      <p>
+        정답 특허는 사람이 새로 라벨링한 값이 아니라 원본 CSV row의 <code>patent_id</code>다.
+        질문과 정답 답변은 전처리 스크립트가 자동 생성했다. 예를 들어 <code>purpose</code> 질문은
+        <code>발명의 명칭</code>으로 질문 문장을 만들고, 정답 답변은 같은 row의
+        <code>AI요약(목적)</code> 컬럼을 사용한다. 따라서 예시 A/B의 정답 답변은 DPR이나 BM25가 만든 문장이 아니라
+        <code>patent_rawdata.csv</code>에 이미 들어 있던 AI 요약 컬럼에서 온 pseudo answer다.
+      </p>
+    </div>
+
+    <h3 id="question-examples">실제 사용 질문 예시</h3>
+    <p class="small">
+      다음 질문들은 <code>data/patent/test.tsv</code>와 <code>test_metadata.jsonl</code>에 들어간 실제 held-out test query다.
+      BM25와 DPR 모두 같은 질문으로 검색했고, 아래에는 ID 대신 실제 질문과 정답 답변 문장을 표시했다.
+    </p>
+    <table class="settings-table" aria-label="actual experiment question examples">
+      <tbody>
+        <tr>
+          <th>question_type</th>
+          <th>실제 질문</th>
+          <th>정답 답변</th>
+        </tr>
+        <tr>
+          <td><code>purpose</code></td>
+          <td><code>'인공지능 코어, 인공지능 코어 시스템 및 인공지능 코어 시스템의 로드/스토어 방법(ai core, ai core system and load/store method of ai core system)' 특허의 기술 목적은 무엇인가?</code></td>
+          <td>인공지능 코어 시스템을 제공하기 위해, 외부 인터페이스와의 밴드위스를 효율적으로 극대화한다.</td>
+        </tr>
+        <tr>
+          <td><code>solution</code></td>
+          <td><code>'인공지능 코어, 인공지능 코어 시스템 및 인공지능 코어 시스템의 로드/스토어 방법(ai core, ai core system and load/store method of ai core system)' 특허는 어떤 해결수단을 제안하는가?</code></td>
+          <td>인공지능 코어, 인공지능 코어 시스템 및 인공지능 코어 시스템의 로드/설치 방법이 개시된다. 인공지능 코어는 인풋 활성화 및 웨이트를 수신하여 2차원 매트릭스 연산을 통해 아웃풋 활성화를 생성하는 프로세싱 유닛, 외부 인터페이스를 통해 수신된 프로그램 및 입력 데이터를 온 칩 버퍼로 전달하고, 온 칩 버퍼로부터 외부 인터페이스로 출력 데이터를 전달하는 로드/설치 작업을 수행한다.</td>
+        </tr>
+        <tr>
+          <td><code>purpose_solution</code></td>
+          <td><code>'인공지능 코어, 인공지능 코어 시스템 및 인공지능 코어 시스템의 로드/스토어 방법(ai core, ai core system and load/store method of ai core system)' 특허의 목적과 솔루션을 설명하라.</code></td>
+          <td>[목적] 인공지능 코어 시스템을 제공하기 위해, 외부 인터페이스와의 밴드위스를 효율적으로 극대화한다. [솔루션] 인공지능 코어는 인풋 활성화 및 웨이트를 수신하여 2차원 매트릭스 연산을 통해 아웃풋 활성화를 생성하고, 현재 작업에 대한 메인 로드/설치 작업과 이후 작업에 대한 대기 로드/설치 작업을 포함한다.</td>
+        </tr>
+        <tr>
+          <td><code>purpose</code></td>
+          <td><code>'High performance computing system for deep learning' 특허의 기술 목적은 무엇인가?</code></td>
+          <td>가속기가 데이터를 처리할 때 호스트 메모리를 사용하지 않고 신속하게 데이터를 처리할 수 있는 컴퓨팅 시스템을 제공한다.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 id="vector-space">Vector space 시각화</h3>
+    <p class="small">
+      아래 4개 그림은 <code>DPR Colab Pro checkpoint 1</code>의 실제 passage embedding을 PCA로 2차원 축소한 것이다.
+      초록색은 같은 <code>gold patent_id</code> passage, 빨간색 X는 query embedding, 회색/파란색 점은 검색 후보 passage를 나타낸다.
+    </p>
+    <div class="vector-overview" aria-label="DPR vector space visualizations">
+      <div class="card vector-card">
+        <h4>예시 A: 인공지능 코어 purpose</h4>
+        <img src="patent_vector_space_case_a.svg" alt="예시 A DPR vector space visualization">
+        <p class="vector-caption">purpose query에서 Colab DPR이 정답 특허 chunk를 query 근처에 배치하는지 확인한다.</p>
+      </div>
+      <div class="card vector-card">
+        <h4>예시 B: 고성능 딥러닝 컴퓨팅 purpose</h4>
+        <img src="patent_vector_space_case_b.svg" alt="예시 B DPR vector space visualization">
+        <p class="vector-caption">영문 특허명 기반 purpose query에서 gold passage와 유사 제목 passage가 함께 모이는 패턴을 보여준다.</p>
+      </div>
+      <div class="card vector-card">
+        <h4>예시 C: 인공지능 코어 solution</h4>
+        <img src="patent_vector_space_case_c.svg" alt="예시 C DPR vector space visualization">
+        <p class="vector-caption">solution query에서 로드/스토어 및 온 칩 버퍼 관련 gold passage가 상위권에 놓이는지 확인한다.</p>
+      </div>
+      <div class="card vector-card">
+        <h4>예시 D: 고성능 딥러닝 컴퓨팅 purpose+solution</h4>
+        <img src="patent_vector_space_case_d.svg" alt="예시 D DPR vector space visualization">
+        <p class="vector-caption">목적과 솔루션을 함께 묻는 복합 query에서 Colab DPR의 검색 공간 배치를 보여준다.</p>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3 id="example-a">예시 A: 인공지능 코어 특허 Top-k 검색 결과 비교</h3>
+        <table class="settings-table" aria-label="retrieval example common hit">
+          <tbody>
+            <tr>
+              <th>항목</th>
+              <th>내용</th>
+            </tr>
+            <tr>
+              <td>Query</td>
+              <td><code>'인공지능 코어, 인공지능 코어 시스템 및 인공지능 코어 시스템의 로드/스토어 방법' 특허의 기술 목적은 무엇인가?</code></td>
+            </tr>
+            <tr>
+              <td>정답 특허</td>
+              <td>인공지능 코어, 인공지능 코어 시스템 및 인공지능 코어 시스템의 로드/스토어 방법</td>
+            </tr>
+            <tr>
+              <td>정답 답변</td>
+              <td>인공지능 코어 시스템을 제공하기 위해, 외부 인터페이스와의 밴드위스를 효율적으로 극대화한다.</td>
+            </tr>
+            <tr>
+              <td>상세 검색 내용</td>
+              <td>
+                <p>
+                  <a class="pill" href="patent_dpr_examples_detail.html#case-a">예시 A 전체 Top-k 검색 내용 보기</a>
+                </p>
+                <p class="small">
+                  본문 가독성을 위해 6개 method × Top-5/10/20/50/100의 전체 passage 목록은 별도 상세 페이지로 분리했다.
+                  이 표는 실제 retrieval output을 그대로 사용하며, Top-100 행은 100개 passage를 모두 포함한다.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td>Top-k별 답변 가능 여부</td>
+              <td>
+                <table class="settings-table" aria-label="case A top k answer availability">
+                  <tbody>
+                    <tr>
+                      <th>Method</th>
+                      <th>첫 정답 rank</th>
+                      <th>Top-5</th>
+                      <th>Top-10</th>
+                      <th>Top-20</th>
+                      <th>Top-50</th>
+                      <th>Top-100</th>
+                      <th>검색 근거로 가능한 답변</th>
+                    </tr>
+                    <tr>
+                      <td>BM25</td>
+                      <td>2</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>인공지능 코어 시스템을 제공하기 위해, 외부 인터페이스와의 밴드위스를 효율적으로 극대화한다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR zero-shot</td>
+                      <td>Top-100 밖</td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td>정답 passage 미검색. Top-100까지는 정답 답변을 안정적으로 생성하기 어렵다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR 1% sampled fine-tuned</td>
+                      <td>Top-100 밖</td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td>정답 passage 미검색. 1% sampled 학습만으로는 해당 질문의 정답 근거가 회수되지 않았다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR local full</td>
+                      <td>2</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>인공지능 코어 시스템을 제공하기 위해, 외부 인터페이스와의 밴드위스를 효율적으로 극대화한다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR Colab Pro checkpoint 1</td>
+                      <td>1</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>인공지능 코어 시스템을 제공하기 위해, 외부 인터페이스와의 밴드위스를 효율적으로 극대화한다.</td>
+                    </tr>
+                    <tr>
+                      <td>BM25+DPR Colab RRF</td>
+                      <td>1</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>인공지능 코어 시스템을 제공하기 위해, 외부 인터페이스와의 밴드위스를 효율적으로 극대화한다.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td>판정</td>
+              <td>zero-shot과 1% sampled는 Top-100 안에서도 정답을 찾지 못했다. local full은 Top-5에서 정답을 찾았고, Colab Pro checkpoint 1은 rank 1에 정답 passage를 올렸다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3 id="example-b">예시 B: 고성능 딥러닝 컴퓨팅 특허 Top-k 검색 결과 비교</h3>
+        <table class="settings-table" aria-label="retrieval example bm25 advantage">
+          <tbody>
+            <tr>
+              <th>항목</th>
+              <th>내용</th>
+            </tr>
+            <tr>
+              <td>Query</td>
+              <td><code>'High performance computing system for deep learning' 특허의 기술 목적은 무엇인가?</code></td>
+            </tr>
+            <tr>
+              <td>정답 특허</td>
+              <td>High performance computing system for deep learning</td>
+            </tr>
+            <tr>
+              <td>정답 답변</td>
+              <td>가속기가 데이터를 처리할 때 호스트 메모리를 사용하지 않고 신속하게 데이터를 처리할 수 있는 컴퓨팅 시스템을 제공한다.</td>
+            </tr>
+            <tr>
+              <td>상세 검색 내용</td>
+              <td>
+                <p>
+                  <a class="pill" href="patent_dpr_examples_detail.html#case-b">예시 B 전체 Top-k 검색 내용 보기</a>
+                </p>
+                <p class="small">
+                  본문 가독성을 위해 6개 method × Top-5/10/20/50/100의 전체 passage 목록은 별도 상세 페이지로 분리했다.
+                  이 표는 실제 retrieval output을 그대로 사용하며, Top-100 행은 100개 passage를 모두 포함한다.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td>Top-k별 답변 가능 여부</td>
+              <td>
+                <table class="settings-table" aria-label="case B top k answer availability">
+                  <tbody>
+                    <tr>
+                      <th>Method</th>
+                      <th>첫 정답 rank</th>
+                      <th>Top-5</th>
+                      <th>Top-10</th>
+                      <th>Top-20</th>
+                      <th>Top-50</th>
+                      <th>Top-100</th>
+                      <th>검색 근거로 가능한 답변</th>
+                    </tr>
+                    <tr>
+                      <td>BM25</td>
+                      <td>1</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>가속기가 데이터를 처리할 때 호스트 메모리를 사용하지 않고 신속하게 데이터를 처리할 수 있는 컴퓨팅 시스템을 제공한다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR zero-shot</td>
+                      <td>Top-100 밖</td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td>정답 passage 미검색. Top-100까지는 high performance computing system 정답 근거가 회수되지 않았다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR 1% sampled fine-tuned</td>
+                      <td>Top-100 밖</td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td>정답 passage 미검색. 유사한 deep learning/accelerator 문서는 일부 검색되지만 gold patent_id에는 도달하지 못했다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR local full</td>
+                      <td>7</td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>Top-10부터 정답 passage가 포함된다. 답변은 가속기가 호스트 메모리를 쓰지 않고 신속히 데이터를 처리하는 컴퓨팅 시스템을 제공하는 것이다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR Colab Pro checkpoint 1</td>
+                      <td>1</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>가속기가 데이터를 처리할 때 호스트 메모리를 사용하지 않고 신속하게 데이터를 처리할 수 있는 컴퓨팅 시스템을 제공한다.</td>
+                    </tr>
+                    <tr>
+                      <td>BM25+DPR Colab RRF</td>
+                      <td>1</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>가속기가 데이터를 처리할 때 호스트 메모리를 사용하지 않고 신속하게 데이터를 처리할 수 있는 컴퓨팅 시스템을 제공한다.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td>판정</td>
+              <td>zero-shot과 1% sampled는 Top-100 안에서도 정답을 찾지 못했다. local full은 Top-5에서는 miss지만 Top-10부터 정답을 찾았고, Colab Pro checkpoint 1은 Top-5 안에 정답 passage를 복수로 올렸다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3 id="example-c">예시 C: 인공지능 코어 특허 Solution 검색 결과 비교</h3>
+        <table class="settings-table" aria-label="case C solution retrieval example">
+          <tbody>
+            <tr>
+              <th>항목</th>
+              <th>내용</th>
+            </tr>
+            <tr>
+              <td>Query</td>
+              <td><code>&#x27;인공지능 코어, 인공지능 코어 시스템 및 인공지능 코어 시스템의 로드/스토어 방법(ai core, ai core system and load/store method of ai core system)&#x27; 특허는 어떤 해결수단을 제안하는가?</code></td>
+            </tr>
+            <tr>
+              <td>정답 특허</td>
+              <td>인공지능 코어, 인공지능 코어 시스템 및 인공지능 코어 시스템의 로드/스토어 방법(ai core, ai core system and load/store method of ai core system)</td>
+            </tr>
+            <tr>
+              <td>정답 답변</td>
+              <td>인공지능 코어, 인공지능 코어 시스템 및 인공지능 코어 시스템의 로드/설치 방법이 개시된다. 인공지능 코어는 인풋 활성화 및 웨이트를 수신하여 2차원 매트릭스 연산을 통해 아웃풋 활성화를 생성하는 프로세싱 유닛, 외부 인터페이스를 통해 수신된 프로그램 및 입력 데이터를 온 칩 버퍼로 전달하고, 온 칩 버퍼로부터 외부 인터페이스로 출력 데이터를 전달하는 로드/설치 작업을 수행한다. 로드/설치 작업은 프로세싱 유닛에 의해 현재 수행되는 현재 작업에 대한 메인 로드/설치 작업 및 프로세싱 유닛에 의해 현재 작업 이후에 수행되는 대기 작업에 대한 대기 로드/설치 작업을 포함한다.</td>
+            </tr>
+            <tr>
+              <td>상세 검색 내용</td>
+              <td>
+                <p>
+                  <a class="pill" href="patent_dpr_examples_detail.html#case-c">예시 C 전체 Top-k 검색 내용 보기</a>
+                </p>
+                <p class="small">
+                  본문 가독성을 위해 6개 method × Top-5/10/20/50/100의 전체 passage 목록은 별도 상세 페이지로 분리했다.
+                  이 표는 실제 retrieval output을 그대로 사용하며, Top-100 행은 100개 passage를 모두 포함한다.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td>Top-k별 답변 가능 여부</td>
+              <td>
+                <table class="settings-table" aria-label="case C top k answer availability">
+                  <tbody>
+                    <tr>
+                      <th>Method</th>
+                      <th>첫 정답 rank</th>
+                      <th>Top-5</th>
+                      <th>Top-10</th>
+                      <th>Top-20</th>
+                      <th>Top-50</th>
+                      <th>Top-100</th>
+                      <th>검색 근거로 가능한 답변</th>
+                    </tr>
+                    <tr>
+                      <td>BM25</td>
+                      <td>2</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>인공지능 코어, 인공지능 코어 시스템 및 인공지능 코어 시스템의 로드/설치 방법이 개시된다. 인공지능 코어는 인풋 활성화 및 웨이트를 수신하여 2차원 매트릭스 연산을 통해 아웃풋 활성화를 생성하는 프로세싱 유닛, 외부 인터페이스를 통해 수신된 프로그램 및 입력 데이터를 온 칩 버퍼로 전달하고, 온 칩 버퍼로부터 외부 인터페이스로 출력 데이터를 전달하는 로드/설치 작업을 수행한다. 로드/설치 작업은 프로세싱 유닛에 의해 현재 수행되는 현재 작업에 대한 메인 로드/설치 작업 및 프로세싱 유닛에 의해 현재 작업 이후에 수행되는 대기 작업에 대한 대기 로드/설치 작업을 포함한다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR zero-shot</td>
+                      <td>Top-100 밖</td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td>정답 passage 미검색. 파인튜닝 전 encoder로는 solution 질문의 정답 근거가 Top-100 안에 들어오지 않았다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR 1% sampled fine-tuned</td>
+                      <td>Top-100 밖</td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td>정답 passage 미검색. 1% sampled 학습만으로는 해당 질문의 정답 근거가 회수되지 않았다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR local full</td>
+                      <td>2</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>인공지능 코어, 인공지능 코어 시스템 및 인공지능 코어 시스템의 로드/설치 방법이 개시된다. 인공지능 코어는 인풋 활성화 및 웨이트를 수신하여 2차원 매트릭스 연산을 통해 아웃풋 활성화를 생성하는 프로세싱 유닛, 외부 인터페이스를 통해 수신된 프로그램 및 입력 데이터를 온 칩 버퍼로 전달하고, 온 칩 버퍼로부터 외부 인터페이스로 출력 데이터를 전달하는 로드/설치 작업을 수행한다. 로드/설치 작업은 프로세싱 유닛에 의해 현재 수행되는 현재 작업에 대한 메인 로드/설치 작업 및 프로세싱 유닛에 의해 현재 작업 이후에 수행되는 대기 작업에 대한 대기 로드/설치 작업을 포함한다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR Colab Pro checkpoint 1</td>
+                      <td>1</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>인공지능 코어, 인공지능 코어 시스템 및 인공지능 코어 시스템의 로드/설치 방법이 개시된다. 인공지능 코어는 인풋 활성화 및 웨이트를 수신하여 2차원 매트릭스 연산을 통해 아웃풋 활성화를 생성하는 프로세싱 유닛, 외부 인터페이스를 통해 수신된 프로그램 및 입력 데이터를 온 칩 버퍼로 전달하고, 온 칩 버퍼로부터 외부 인터페이스로 출력 데이터를 전달하는 로드/설치 작업을 수행한다. 로드/설치 작업은 프로세싱 유닛에 의해 현재 수행되는 현재 작업에 대한 메인 로드/설치 작업 및 프로세싱 유닛에 의해 현재 작업 이후에 수행되는 대기 작업에 대한 대기 로드/설치 작업을 포함한다.</td>
+                    </tr>
+                    <tr>
+                      <td>BM25+DPR Colab RRF</td>
+                      <td>1</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>인공지능 코어, 인공지능 코어 시스템 및 인공지능 코어 시스템의 로드/설치 방법이 개시된다. 인공지능 코어는 인풋 활성화 및 웨이트를 수신하여 2차원 매트릭스 연산을 통해 아웃풋 활성화를 생성하는 프로세싱 유닛, 외부 인터페이스를 통해 수신된 프로그램 및 입력 데이터를 온 칩 버퍼로 전달하고, 온 칩 버퍼로부터 외부 인터페이스로 출력 데이터를 전달하는 로드/설치 작업을 수행한다. 로드/설치 작업은 프로세싱 유닛에 의해 현재 수행되는 현재 작업에 대한 메인 로드/설치 작업 및 프로세싱 유닛에 의해 현재 작업 이후에 수행되는 대기 작업에 대한 대기 로드/설치 작업을 포함한다.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td>판정</td>
+              <td>zero-shot과 1% sampled는 Top-100 안에서도 정답을 찾지 못했다. local full은 rank 2에서 정답을 찾았고, Colab Pro checkpoint 1은 rank 1에 정답 passage를 올렸다. BM25+DPR RRF는 rank 1에서 정답을 회수했다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3 id="example-d">예시 D: 고성능 딥러닝 컴퓨팅 특허 Purpose+Solution 검색 결과 비교</h3>
+        <table class="settings-table" aria-label="case D purpose solution retrieval example">
+          <tbody>
+            <tr>
+              <th>항목</th>
+              <th>내용</th>
+            </tr>
+            <tr>
+              <td>Query</td>
+              <td><code>&#x27;High performance computing system for deep learning&#x27; 특허의 목적과 솔루션을 설명하라.</code></td>
+            </tr>
+            <tr>
+              <td>정답 특허</td>
+              <td>High performance computing system for deep learning</td>
+            </tr>
+            <tr>
+              <td>정답 답변</td>
+              <td>[목적] 가속기가 데이터를 처리할 때 호스트 메모리를 사용하지 않고 신속하게 데이터를 처리할 수 있는 컴퓨팅 시스템을 제공한다. [솔루션] 컴퓨팅 시스템은 호스트 프로세서, 통신 인터페이스에 기초하여 호스트 프로세서와 통신하는 복수의 가속기들, 그리고 상호 연결 네트워크를 통해 복수의 가속기들과 연결되는 복수의 메모리 노드들을 포함한다. 복수의 가속기들 중 제1 가속기와 복수의 메모리 노드들 중 제1 메모리 노드 사이에 제1 데이터 링크가 설정되고, 제1 가속기와 복수의 메모리 노드들 중 제2 메모리 노드 사이에 제2 데이터 링크가 설정된다.</td>
+            </tr>
+            <tr>
+              <td>상세 검색 내용</td>
+              <td>
+                <p>
+                  <a class="pill" href="patent_dpr_examples_detail.html#case-d">예시 D 전체 Top-k 검색 내용 보기</a>
+                </p>
+                <p class="small">
+                  본문 가독성을 위해 6개 method × Top-5/10/20/50/100의 전체 passage 목록은 별도 상세 페이지로 분리했다.
+                  이 표는 실제 retrieval output을 그대로 사용하며, Top-100 행은 100개 passage를 모두 포함한다.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td>Top-k별 답변 가능 여부</td>
+              <td>
+                <table class="settings-table" aria-label="case D top k answer availability">
+                  <tbody>
+                    <tr>
+                      <th>Method</th>
+                      <th>첫 정답 rank</th>
+                      <th>Top-5</th>
+                      <th>Top-10</th>
+                      <th>Top-20</th>
+                      <th>Top-50</th>
+                      <th>Top-100</th>
+                      <th>검색 근거로 가능한 답변</th>
+                    </tr>
+                    <tr>
+                      <td>BM25</td>
+                      <td>1</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>[목적] 가속기가 데이터를 처리할 때 호스트 메모리를 사용하지 않고 신속하게 데이터를 처리할 수 있는 컴퓨팅 시스템을 제공한다. [솔루션] 컴퓨팅 시스템은 호스트 프로세서, 통신 인터페이스에 기초하여 호스트 프로세서와 통신하는 복수의 가속기들, 그리고 상호 연결 네트워크를 통해 복수의 가속기들과 연결되는 복수의 메모리 노드들을 포함한다. 복수의 가속기들 중 제1 가속기와 복수의 메모리 노드들 중 제1 메모리 노드 사이에 제1 데이터 링크가 설정되고, 제1 가속기와 복수의 메모리 노드들 중 제2 메모리 노드 사이에 제2 데이터 링크가 설정된다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR zero-shot</td>
+                      <td>Top-100 밖</td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td>정답 passage 미검색. 파인튜닝 전 encoder로는 purpose_solution 질문의 정답 근거가 Top-100 안에 들어오지 않았다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR 1% sampled fine-tuned</td>
+                      <td>Top-100 밖</td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td>정답 passage 미검색. 1% sampled 학습만으로는 해당 질문의 정답 근거가 회수되지 않았다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR local full</td>
+                      <td>9</td>
+                      <td><span class="judge-tag unsupported">miss</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>Top-10부터 정답 passage가 포함된다. 검색 근거 답변: [목적] 가속기가 데이터를 처리할 때 호스트 메모리를 사용하지 않고 신속하게 데이터를 처리할 수 있는 컴퓨팅 시스템을 제공한다. [솔루션] 컴퓨팅 시스템은 호스트 프로세서, 통신 인터페이스에 기초하여 호스트 프로세서와 통신하는 복수의 가속기들, 그리고 상호 연결 네트워크를 통해 복수의 가속기들과 연결되는 복수의 메모리 노드들을 포함한다. 복수의 가속기들 중 제1 가속기와 복수의 메모리 노드들 중 제1 메모리 노드 사이에 제1 데이터 링크가 설정되고, 제1 가속기와 복수의 메모리 노드들 중 제2 메모리 노드 사이에 제2 데이터 링크가 설정된다.</td>
+                    </tr>
+                    <tr>
+                      <td>DPR Colab Pro checkpoint 1</td>
+                      <td>1</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>[목적] 가속기가 데이터를 처리할 때 호스트 메모리를 사용하지 않고 신속하게 데이터를 처리할 수 있는 컴퓨팅 시스템을 제공한다. [솔루션] 컴퓨팅 시스템은 호스트 프로세서, 통신 인터페이스에 기초하여 호스트 프로세서와 통신하는 복수의 가속기들, 그리고 상호 연결 네트워크를 통해 복수의 가속기들과 연결되는 복수의 메모리 노드들을 포함한다. 복수의 가속기들 중 제1 가속기와 복수의 메모리 노드들 중 제1 메모리 노드 사이에 제1 데이터 링크가 설정되고, 제1 가속기와 복수의 메모리 노드들 중 제2 메모리 노드 사이에 제2 데이터 링크가 설정된다.</td>
+                    </tr>
+                    <tr>
+                      <td>BM25+DPR Colab RRF</td>
+                      <td>1</td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td><span class="judge-tag supported">hit</span></td>
+                      <td>[목적] 가속기가 데이터를 처리할 때 호스트 메모리를 사용하지 않고 신속하게 데이터를 처리할 수 있는 컴퓨팅 시스템을 제공한다. [솔루션] 컴퓨팅 시스템은 호스트 프로세서, 통신 인터페이스에 기초하여 호스트 프로세서와 통신하는 복수의 가속기들, 그리고 상호 연결 네트워크를 통해 복수의 가속기들과 연결되는 복수의 메모리 노드들을 포함한다. 복수의 가속기들 중 제1 가속기와 복수의 메모리 노드들 중 제1 메모리 노드 사이에 제1 데이터 링크가 설정되고, 제1 가속기와 복수의 메모리 노드들 중 제2 메모리 노드 사이에 제2 데이터 링크가 설정된다.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td>판정</td>
+              <td>zero-shot과 1% sampled는 Top-100 안에서도 정답을 찾지 못했다. local full은 rank 9에서 정답을 찾았고, Colab Pro checkpoint 1은 rank 1에 정답 passage를 올렸다. BM25+DPR RRF는 rank 1에서 정답을 회수했다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="small">
+      예시 B/D처럼 질문에 특허명이 직접 들어가면 BM25는 제목과 표면 키워드 일치만으로 높은 순위를 만들 수 있다.
+      zero-shot과 1% sampled DPR은 retrieval 목적함수에 충분히 맞춰지지 않아 무관한 신경망/AI 특허를 먼저 올린다.
+      local full은 의미적으로 가까운 deep learning hardware 특허를 먼저 올리는 케이스가 남지만,
+      Colab Pro checkpoint 1처럼 batch 128과 40 epoch 조건에 가까워지면 정답 passage가 Top-5로 회복된다.
+    </p>
+
+    <h3>GPT-5.5 xhigh 보조 검증</h3>
+    <p>
+      아래 판정은 GPT-5.5 xhigh가 각 method의 Top-5 snippet만 보고 질문에 답한 뒤,
+      그 답변이 정답 답변을 지지하는지 판단한 결과다. 이 검증은 공식 retrieval accuracy를 대체하지 않고,
+      검색 결과가 실제 답변 근거로 충분한지 확인하는 정성 보조 분석으로만 사용한다.
+    </p>
+    <table class="settings-table" aria-label="gpt 5.5 xhigh judge case A">
+      <tbody>
+        <tr>
+          <th colspan="4">Case A: 인공지능 코어 로드/스토어 특허의 기술 목적</th>
+        </tr>
+        <tr>
+          <th>Method</th>
+          <th>GPT 답변</th>
+          <th>판정</th>
+          <th>이유</th>
+        </tr>
+        <tr>
+          <td>BM25</td>
+          <td>외부 인터페이스와의 밴드위스를 효율적으로 극대화하는 것이다.</td>
+          <td><span class="judge-tag supported">Supported</span></td>
+          <td>스니펫에 gold와 동일한 기술 목적이 직접 제시되어 있다.</td>
+        </tr>
+        <tr>
+          <td>DPR zero-shot</td>
+          <td>스니펫만으로는 해당 특허의 기술 목적을 도출할 수 없다.</td>
+          <td><span class="judge-tag unsupported">Unsupported</span></td>
+          <td>외부 인터페이스 밴드위스나 로드/스토어 관련 근거가 없다.</td>
+        </tr>
+        <tr>
+          <td>DPR 1% sampled fine-tuned</td>
+          <td>인공지능 가속기의 데이터 처리 효율을 개선하는 것으로 보인다.</td>
+          <td><span class="judge-tag partial">Partial</span></td>
+          <td>가속기 효율 관련 단서는 있으나 gold의 외부 인터페이스 밴드위스 목적은 없다.</td>
+        </tr>
+        <tr>
+          <td>DPR local full</td>
+          <td>외부 인터페이스와의 밴드위스를 효율적으로 극대화하는 것이다.</td>
+          <td><span class="judge-tag supported">Supported</span></td>
+          <td>기술 목적 문장이 직접 포함되어 있고 관련 구조 설명도 뒷받침한다.</td>
+        </tr>
+        <tr>
+          <td>DPR Colab Pro checkpoint 1</td>
+          <td>외부 인터페이스와의 밴드위스를 효율적으로 극대화하는 것이다.</td>
+          <td><span class="judge-tag supported">Supported</span></td>
+          <td>기술 목적과 로드/스토어 구조가 명시되어 충분히 답할 수 있다.</td>
+        </tr>
+        <tr>
+          <td>BM25+DPR Colab RRF</td>
+          <td>외부 인터페이스와의 밴드위스를 효율적으로 극대화하는 것이다.</td>
+          <td><span class="judge-tag supported">Supported</span></td>
+          <td>rank fusion 후에도 정답 passage가 rank 1에 있어 충분히 답할 수 있다.</td>
+        </tr>
+      </tbody>
+    </table>
+    <table class="settings-table" aria-label="gpt 5.5 xhigh judge case B">
+      <tbody>
+        <tr>
+          <th colspan="4">Case B: High performance computing system for deep learning 특허의 기술 목적</th>
+        </tr>
+        <tr>
+          <th>Method</th>
+          <th>GPT 답변</th>
+          <th>판정</th>
+          <th>이유</th>
+        </tr>
+        <tr>
+          <td>BM25</td>
+          <td>호스트 메모리를 사용하지 않고 가속기가 데이터를 신속하게 처리할 수 있는 컴퓨팅 시스템을 제공하는 것이다.</td>
+          <td><span class="judge-tag supported">Supported</span></td>
+          <td>gold와 같은 기술 목적이 직접 제시되어 있다.</td>
+        </tr>
+        <tr>
+          <td>DPR zero-shot</td>
+          <td>스니펫만으로는 해당 특허의 기술 목적을 도출할 수 없다.</td>
+          <td><span class="judge-tag unsupported">Unsupported</span></td>
+          <td>대부분 무관한 기술이며 호스트 메모리 미사용 근거가 없다.</td>
+        </tr>
+        <tr>
+          <td>DPR 1% sampled fine-tuned</td>
+          <td>딥러닝 가속 기술의 성능과 효율성을 개선하는 것이다.</td>
+          <td><span class="judge-tag partial">Partial</span></td>
+          <td>딥러닝 가속 성능 개선 단서는 있으나 호스트 메모리 미사용 목적은 없다.</td>
+        </tr>
+        <tr>
+          <td>DPR local full</td>
+          <td>딥러닝 가속기 시스템의 전력 소비와 전력 할당을 최적화하는 것이다.</td>
+          <td><span class="judge-tag unsupported">Unsupported</span></td>
+          <td>전력 관리 관련 내용만 있고 gold의 데이터 처리 목적과 다르다.</td>
+        </tr>
+        <tr>
+          <td>DPR Colab Pro checkpoint 1</td>
+          <td>호스트 메모리를 사용하지 않고 데이터를 신속하게 처리할 수 있는 컴퓨팅 시스템을 제공하는 것이다.</td>
+          <td><span class="judge-tag supported">Supported</span></td>
+          <td>기술 목적이 직접 포함되어 있고 시스템 구성 설명도 일치한다.</td>
+        </tr>
+        <tr>
+          <td>BM25+DPR Colab RRF</td>
+          <td>호스트 메모리를 사용하지 않고 데이터를 신속하게 처리할 수 있는 컴퓨팅 시스템을 제공하는 것이다.</td>
+          <td><span class="judge-tag supported">Supported</span></td>
+          <td>rank fusion 후에도 정답 passage가 rank 1에 있어 충분히 답할 수 있다.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="small">
+      원본 판정 기록: <code>outputs/patent_dpr_llm_judge/gpt55_xhigh_example_judgments.md</code>.
+      전체 test set에 이 방식을 적용하려면 각 query의 Top-k snippet을 LLM에 넣어야 하므로 비용과 시간이 별도로 발생한다.
+    </p>
+
+    <h2 id="data-transform">4. 데이터 변환 방식</h2>
+    <div class="flow" aria-label="data pipeline">
+      <div class="step">
+        <strong>CSV 입력</strong>
+        <span><code>patent_rawdata.csv</code>에서 특허 row를 읽고 결측 본문을 제외한다.</span>
+      </div>
+      <div class="step">
+        <strong>Passage 생성</strong>
+        <span><code>graphrag_text</code>를 기본 본문으로 사용하고 긴 문서는 chunking한다.</span>
+      </div>
+      <div class="step">
+        <strong>QA 생성</strong>
+        <span>목적, 해결수단, 목적+솔루션 질문을 특허별로 자동 생성한다.</span>
+      </div>
+      <div class="step">
+        <strong>BM25 mining</strong>
+        <span>positive가 아닌 상위 BM25 passage를 hard negative로 저장한다.</span>
+      </div>
+      <div class="step">
+        <strong>평가</strong>
+        <span>Top-k 내 동일 <code>patent_id</code> passage 검색 여부를 측정한다.</span>
+      </div>
+    </div>
+
+    <h3>생성 파일</h3>
+    <ul class="list">
+      <li><a href="../data/patent/passages.tsv"><code>data/patent/passages.tsv</code></a>: DPR context 형식 <code>id TAB text TAB title</code></li>
+      <li><a href="../data/patent/train.json"><code>data/patent/train.json</code></a>: DPR bi-encoder 학습 데이터</li>
+      <li><a href="../data/patent/dev.json"><code>data/patent/dev.json</code></a>: DPR dev 데이터</li>
+      <li><a href="../data/patent/test.tsv"><code>data/patent/test.tsv</code></a>: retrieval 평가용 question-answer TSV</li>
+      <li><a href="../data/patent/bm25_results.json"><code>data/patent/bm25_results.json</code></a>: BM25 baseline 및 hard negative mining 결과</li>
+    </ul>
+
+    <h2 id="dpr-training">5. DPR 학습 구조</h2>
+    <p>
+      DPR은 question encoder와 passage encoder를 별도로 두는 bi-encoder 구조다.
+      현재 설정은 한국어와 영어가 섞인 특허명을 고려해 <code>bert-base-multilingual-cased</code>를 사용했다.
+      DPR 논문의 in-batch negative 학습 구조는 그대로 유지했다.
+    </p>
+    <pre>Q = [q1, q2, ..., qB] in R^(B x d)
+P = [p1+, p2+, ..., pB+] in R^(B x d)
+S = QP^T in R^(B x B)</pre>
+    <p>
+      score matrix <code>S</code>의 대각선이 positive pair다. 같은 batch 안의 다른 passage는 in-batch negative가 된다.
+      BM25 hard negative를 하나씩 추가하면 passage 행렬은 다음처럼 확장된다.
+    </p>
+    <pre>P = [p1+, h1, p2+, h2, ..., pB+, hB] in R^(2B x d)
+S = QP^T in R^(B x 2B)</pre>
+    <p>
+      각 question row에서 정답 positive passage 위치를 맞히도록 cross entropy를 최소화한다.
+    </p>
+
+    <h3 id="q-matrix">Q 행렬과 In-batch Negative 예시</h3>
+    <p>
+      아래는 Colab Pro checkpoint 1의 <code>batch_size=128</code> 학습 구조를 기준으로 그린 예시다.
+      <code>data/patent/train.json</code>에서 가져온 실제 학습 샘플 중 q1-q3만 펼쳐 보여주고,
+      q4부터 q127은 생략했다. 정확한 runtime batch 순서는 shuffle 때문에 로그에 남아 있지 않으므로,
+      여기서는 실제 train row의 질문, positive passage, BM25 hard negative를 사용해 batch 128 구조를 설명한다.
+    </p>
+    <div class="matrix-viz" aria-label="Q matrix and in-batch negative visualization">
+      <div class="matrix-panel">
+        <h3>Batch 128 중 실제 train sample 예시</h3>
+        <div class="embedding-list">
+          <div class="embedding-item actual">
+            <strong>q1</strong>
+            <span>뉴럴 프로세싱 장치의 기술 목적 질문<em>p1+: 프리차지 변환으로 데이터 전송 효율을 극대화하는 뉴럴 프로세싱 장치</em><em>h1: 유사 제목의 2022년 뉴럴 프로세싱 장치 chunk</em></span>
+            <code>train[0]</code>
+          </div>
+          <div class="embedding-item actual">
+            <strong>q2</strong>
+            <span>데이터 처리 장치의 기술 목적 질문<em>p2+: 데이터 처리 장치, 방법, 전자 장치 및 저장 매체 제공</em><em>h2: 행렬 곱셈 데이터 처리 방법 chunk</em></span>
+            <code>train[3]</code>
+          </div>
+          <div class="embedding-item actual">
+            <strong>q3</strong>
+            <span>행렬 곱셈 데이터 처리 방법의 기술 목적 질문<em>p3+: 행렬 곱셈 데이터 처리 장치 및 저장 매체 제공</em><em>h3: 데이터 처리 장치 관련 chunk</em></span>
+            <code>train[6]</code>
+          </div>
+        </div>
+        <p class="small" style="margin-top: 10px;">
+          실제 학습 행렬은 <code>Q in R^(128 x 768)</code>이다. 위 목록은 그중 q1-q3의 실제 질문과
+          positive/hard negative 내용을 보여주는 발췌다.
+        </p>
+      </div>
+
+      <div class="matrix-panel">
+        <h3>Score matrix: <code>S = QP^T</code> <code>128 x 128</code></h3>
+        <div class="matrix-wrap">
+          <table class="score-matrix" aria-label="in-batch score matrix">
+            <thead>
+              <tr>
+                <th>S</th>
+                <th>p1+<br>뉴럴 처리</th>
+                <th>p2+<br>데이터 처리</th>
+                <th>p3+<br>행렬 곱셈</th>
+                <th>...</th>
+                <th>p128+</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th>q1<br>뉴럴 처리</th>
+                <td class="positive">positive</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="omitted">...</td>
+                <td class="inbatch">in-batch neg</td>
+              </tr>
+              <tr>
+                <th>q2<br>데이터 처리</th>
+                <td class="inbatch">in-batch neg</td>
+                <td class="positive">positive</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="omitted">...</td>
+                <td class="inbatch">in-batch neg</td>
+              </tr>
+              <tr>
+                <th>q3<br>행렬 곱셈</th>
+                <td class="inbatch">in-batch neg</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="positive">positive</td>
+                <td class="omitted">...</td>
+                <td class="inbatch">in-batch neg</td>
+              </tr>
+              <tr>
+                <th>...</th>
+                <td class="omitted">...</td>
+                <td class="omitted">...</td>
+                <td class="omitted">...</td>
+                <td class="omitted">...</td>
+                <td class="omitted">...</td>
+              </tr>
+              <tr>
+                <th>q128</th>
+                <td class="inbatch">in-batch neg</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="omitted">...</td>
+                <td class="positive">positive</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="legend">
+          <span><i class="pos"></i>대각선 positive</span>
+          <span><i class="neg"></i>같은 batch의 in-batch negative</span>
+        </div>
+      </div>
+
+      <div class="matrix-panel wide">
+        <h3>실제 BM25 hard negative를 1개씩 붙인 경우</h3>
+        <p>
+          각 question마다 train data에 저장된 BM25 hard negative <code>h</code>를 추가하면 batch 128의 passage 후보가
+          <code>[p1+, h1, p2+, h2, ..., p128+, h128]</code>로 확장된다. 아래 표는 전체
+          <code>128 x 256</code> score matrix 중 q1-q3와 q128, 그리고 일부 column만 펼친 것이다. 이 실제 샘플에서는
+          <code>h2</code>가 <code>p3+</code>와 같은 passage이고, <code>h3</code>는 q2의 positive 특허와 같은 계열이다.
+          즉 BM25 hard negative는 모델에 강한 구분 신호를 주지만, 특허 데이터에서는 near-positive에 가까운 어려운 negative도 포함한다.
+        </p>
+        <div class="matrix-wrap">
+          <table class="score-matrix" aria-label="hard negative score matrix">
+            <thead>
+              <tr>
+                <th>S</th>
+                <th>p1+<br>뉴럴 처리</th>
+                <th>h1<br>유사 뉴럴 처리</th>
+                <th>p2+<br>데이터 처리</th>
+                <th>h2<br>행렬 곱셈</th>
+                <th>p3+<br>행렬 곱셈</th>
+                <th>h3<br>데이터 처리</th>
+                <th>...</th>
+                <th>p128+</th>
+                <th>h128</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th>q1<br>뉴럴 처리</th>
+                <td class="positive">positive</td>
+                <td class="hard">hard neg</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="hard">hard neg</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="hard">hard neg</td>
+                <td class="omitted">...</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="hard">hard neg</td>
+              </tr>
+              <tr>
+                <th>q2<br>데이터 처리</th>
+                <td class="inbatch">in-batch neg</td>
+                <td class="hard">hard neg</td>
+                <td class="positive">positive</td>
+                <td class="hard">hard neg<br>p3와 동일</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="hard">hard neg</td>
+                <td class="omitted">...</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="hard">hard neg</td>
+              </tr>
+              <tr>
+                <th>q3<br>행렬 곱셈</th>
+                <td class="inbatch">in-batch neg</td>
+                <td class="hard">hard neg</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="hard">hard neg<br>p3와 동일</td>
+                <td class="positive">positive</td>
+                <td class="hard">hard neg<br>q2 계열</td>
+                <td class="omitted">...</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="hard">hard neg</td>
+              </tr>
+              <tr>
+                <th>...</th>
+                <td class="omitted">...</td>
+                <td class="omitted">...</td>
+                <td class="omitted">...</td>
+                <td class="omitted">...</td>
+                <td class="omitted">...</td>
+                <td class="omitted">...</td>
+                <td class="omitted">...</td>
+                <td class="omitted">...</td>
+                <td class="omitted">...</td>
+              </tr>
+              <tr>
+                <th>q128</th>
+                <td class="inbatch">in-batch neg</td>
+                <td class="hard">hard neg</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="hard">hard neg</td>
+                <td class="inbatch">in-batch neg</td>
+                <td class="hard">hard neg</td>
+                <td class="omitted">...</td>
+                <td class="positive">positive</td>
+                <td class="hard">hard neg</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="legend">
+          <span><i class="pos"></i>정답 passage</span>
+          <span><i class="neg"></i>다른 sample의 positive passage</span>
+          <span><i class="hn"></i>BM25 hard negative</span>
+        </div>
+        <p class="small">
+          Colab Pro checkpoint 1의 학습 조건은 <code>batch_size=128</code>, <code>hard_negatives=1</code>이므로
+          실제 score matrix는 <code>128 x 256</code>이다. 표에서는 가독성을 위해 q4-q127과 중간 passage column을 생략했다.
+        </p>
+      </div>
+    </div>
+
+    <h3 id="qps-viz">Q/P/S 전체 시각화: BM25 hard negative 포함 batch 128</h3>
+    <p>
+      DPR Colab Pro checkpoint 1 학습은 <code>batch_size=128</code>, <code>hard_negatives=1</code>,
+      <code>bert-base-multilingual-cased</code> hidden size <code>d=768</code> 조건으로 돌렸다.
+      따라서 실제 학습 step에서 question 행렬은 <code>Q in R^(128 x 768)</code>이고,
+      passage 후보는 각 question의 positive 1개와 BM25 hard negative 1개를 합친
+      <code>[p1+, h1, p2+, h2, ..., p128+, h128]</code>이다. 이 기준의 score matrix는
+      <code>S = QP<sup>T</sup> in R^(128 x 256)</code>이다.
+    </p>
+    <div class="tensor-flow" aria-label="full Q P and score matrix visualization for batch 128">
+      <div class="tensor-card">
+        <div class="tensor-title">
+          <strong>Q 행렬</strong>
+          <code>128 x 768</code>
+        </div>
+        <div class="tensor-rect q" role="img" aria-label="Q matrix with 128 question rows and 768 embedding columns">
+          <span class="axis-label top">rows: q1 ... q128</span>
+          <span class="axis-label bottom">cols: embedding dim d=768</span>
+        </div>
+        <p class="small">
+          각 row는 실제 patent question embedding이다. 예: <code>q1</code>은 뉴럴 프로세싱 장치의 목적 질문,
+          <code>q2</code>는 데이터 처리 장치의 목적 질문, <code>q3</code>는 행렬 곱셈 데이터 처리 방법의 목적 질문이다.
+        </p>
+      </div>
+      <div class="operator">x</div>
+      <div class="tensor-card">
+        <div class="tensor-title">
+          <strong>P<sup>T</sup> 행렬</strong>
+          <code>768 x 256</code>
+        </div>
+        <div class="tensor-rect p" role="img" aria-label="transposed passage matrix with 128 positives and 128 hard negatives">
+          <span class="axis-label top">cols: p1+, h1, ... p128+, h128</span>
+          <span class="axis-label bottom">rows: embedding dim d=768</span>
+        </div>
+        <p class="small">
+          passage 후보는 <code>[p1+, h1, p2+, h2, ..., p128+, h128]</code>이다.
+          위 실제 샘플 기준으로 <code>p1+</code>는 뉴럴 프로세싱 장치, <code>h1</code>은 유사 뉴럴 프로세싱 장치,
+          <code>p2+</code>는 데이터 처리 장치, <code>h2</code>는 행렬 곱셈 데이터 처리 passage다.
+        </p>
+      </div>
+      <div class="operator">=</div>
+      <div class="tensor-card">
+        <div class="tensor-title">
+          <strong>S = QP<sup>T</sup></strong>
+          <code>128 x 256</code>
+        </div>
+        <div class="tensor-rect s" role="img" aria-label="score matrix with 128 question rows and 256 passage candidate columns">
+          <span class="axis-label top">rows: q1 ... q128</span>
+          <span class="axis-label bottom">cols: p+/h candidates</span>
+        </div>
+        <p class="small">
+          각 row의 초록 대각선 위치가 정답 positive passage다. 나머지 positive passage들은
+          in-batch negative, <code>h</code> 열은 BM25 hard negative로 작동한다.
+        </p>
+      </div>
+    </div>
+    <div class="legend">
+      <span><i class="pos"></i>target positive column</span>
+      <span><i class="neg"></i>in-batch negative columns</span>
+      <span><i class="hn"></i>BM25 hard negative columns</span>
+    </div>
+    <div class="target-index">
+      <strong>정리:</strong>
+      논문식 in-batch negative core만 따로 떼어 보면 <code>128 x 128</code>이지만,
+      DPR 논문의 최종 학습 설정과 본 실험처럼 BM25 hard negative 1개를 question마다 추가하면
+      실제 학습 score matrix는 <code>128 x 256</code>이다. 이 행렬의 정답 column index는
+      context 순서 <code>[p1+, h1, p2+, h2, ..., p128+, h128]</code>에서
+      0-based 기준 <code>[0, 2, 4, ..., 254]</code>다.
+    </div>
+
+    <h2 id="interpretation">6. 현재 결과 해석</h2>
+    <div class="callout" style="margin-top: 16px;">
+      <strong>DPR 및 BM25 수치가 높게 나오는 이유</strong>
+      <ol class="list">
+        <li>
+          <strong>질문에 특허명이 그대로 들어간다.</strong>
+          예를 들어 <code>'반도체 칩 기반 온디바이스 추론 가속 장치' 특허의 기술 목적은 무엇인가?</code>처럼
+          <code>발명의 명칭</code>이 query에 통째로 포함된다. passage에도 같은 발명의 명칭이 들어 있으므로,
+          상당 부분은 제목 매칭만으로도 풀린다. BM25가 Top-5 <code>92.18</code>까지 나오는 핵심 이유다.
+        </li>
+        <li>
+          <strong>Corpus 규모가 작다.</strong>
+          본 실험의 passage corpus는 <code>30,809</code>개다. DPR 논문의 Wikipedia corpus는 약
+          <code>2,100만</code> passage 규모이므로, 후보 수가 약 <code>680~700배</code> 적다.
+          후보가 적을수록 정답 passage가 Top-k 안에 들어올 확률은 높아진다.
+        </li>
+        <li>
+          <strong>한 특허당 chunk가 여러 개다.</strong>
+          <code>6,645</code>개 특허를 140-token chunk로 나눠 <code>30,809</code>개 passage를 만들었기 때문에,
+          평균적으로 특허 하나당 약 <code>4~5</code>개 chunk가 있다. Top-100을 뽑으면 같은
+          <code>gold patent_id</code>의 chunk가 하나라도 걸릴 가능성이 커진다.
+        </li>
+        <li>
+          <strong>질문이 템플릿 기반이다.</strong>
+          질문 유형은 <code>purpose</code>, <code>solution</code>, <code>purpose_solution</code> 세 가지 고정 패턴이다.
+          Natural Questions처럼 사람이 자유롭게 쓴 다양한 질문이 아니라, 모델이 학습해야 할 질문 구조가 제한적이다.
+        </li>
+        <li>
+          <strong>Passage에 구조화된 메타데이터가 포함되어 있다.</strong>
+          <code>graphrag_text</code>에는 특허ID, 발명의 명칭, IPC/CPC, 기술 목적, 해결수단이 라벨 형태로 들어간다.
+          검색 단서가 풍부하므로 sparse retrieval과 dense retrieval 모두 높은 Top-k 수치를 얻기 쉬운 조건이다.
+        </li>
+      </ol>
+      <p>
+        따라서 실험 자체가 잘못된 것은 아니지만, <strong>“DPR이 BM25를 이겼다”</strong>고 일반화하기에는
+        현재 task 난이도가 낮다는 점을 함께 기록해야 한다. DPR 논문에서 dense retrieval의 가치가 크게 드러나는 지점은
+        lexical matching만으로 잡기 어려운 의미적 질문을 처리할 때다. 본 설정에서는 BM25만으로도 Top-5
+        <code>92.18</code>이 나오므로, dense retrieval의 필요성이 약하게 보이는 구조다.
+      </p>
+    </div>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>BM25가 강하게 나온 이유</h3>
+        <ul class="list">
+          <li>질문에 특허명과 핵심 키워드가 직접 포함되어 lexical matching에 유리하다.</li>
+          <li>passage에도 특허ID, 발명의 명칭, IPC/CPC, 목적, 해결수단이 함께 들어간다.</li>
+          <li>이 데이터 구성에서는 단어 일치 기반 검색만으로도 gold patent_id를 매우 잘 찾는다.</li>
+          <li>전문용어, 장치명, 공정명처럼 표면형 단어가 중요한 특허 검색에서는 BM25의 sparse matching이 Top-5 정렬에 강하다.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>DPR이 Top-5에서 밀린 이유</h3>
+        <ul class="list">
+          <li>파인튜닝 전 mBERT encoder는 question-passage retrieval 목적함수로 정렬되어 있지 않다.</li>
+          <li>mBERT 임베딩이 특허 도메인 문장과 긴 한국어 요약 retrieval에 아직 맞춰지지 않았다.</li>
+          <li>fine-tuning 후에도 의미적으로 비슷한 반도체 특허가 많아 정확한 gold 특허가 Top-5 밖으로 밀리는 사례가 있다.</li>
+          <li>로컬 full 학습은 batch size 2라 큰 in-batch negative 효과가 제한적이었지만, Colab Pro checkpoint 1은 batch size 128로 이 한계를 크게 줄였다.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout" style="margin-top: 16px;">
+      <strong>해석상 주의점</strong>
+      <p>
+        DPR이 약한 모델이라는 뜻은 아니다. 실제로 full fine-tuning 후 DPR은 Top-20에서 BM25와 거의 같은 수준이고,
+        Top-100에서는 BM25보다 높다. 즉 정답 특허를 넓은 후보군 안에는 잘 넣지만, 현재 질문이 특허명을 직접 포함하므로
+        Top-5의 세밀한 순위화에서는 BM25가 더 유리한 실험 구조다.
+      </p>
+    </div>
+    <div class="callout ok" style="margin-top: 16px;">
+      <strong>Full fine-tuning 결과</strong>
+      <p>
+        전체 train split 1 epoch 학습 후 DPR은 Top-5 <code>87.22</code>, Top-20 <code>95.99</code>,
+        Top-100 <code>99.40</code>까지 상승했다. BM25 대비 Top-5는 낮지만, Top-20은 거의 같은 수준이고
+        Top-100에서는 DPR이 더 높게 측정됐다.
+      </p>
+    </div>
+    <div class="callout ok" style="margin-top: 16px;">
+      <strong>Colab Pro checkpoint 1 결과</strong>
+      <p>
+        A100 80GB에서 actual <code>batch_size=128</code>로 학습한 checkpoint 중 현재 로컬에 확보된
+        <code>dpr_biencoder.0</code>부터 <code>dpr_biencoder.4</code> 중 dev NLL이 가장 낮은
+        <code>dpr_biencoder.1</code>을 평가했다. Top-5 <code>98.30</code>, Top-20 <code>99.55</code>,
+        Top-100 <code>100.00</code>으로 BM25와 local DPR을 모두 상회했다.
+      </p>
+    </div>
+
+    <h2 id="finetuning-log">7. Fine-tuning 실행 기록</h2>
+    <div class="callout ok">
+      <strong>완료된 로컬 run</strong>
+      <p>
+        <code>DPR zero-shot</code>을 파인튜닝 전 기준선으로 두고, 전체 train split 15,948 queries로
+        1 epoch fine-tuning을 수행했다. 비교 기준은 동일한 corpus, 동일한 test split, 동일한 Top-k,
+        동일한 gold patent_id hit rate로 유지했다.
+      </p>
+    </div>
+
+    <h3>수행한 순서</h3>
+    <ol class="list">
+      <li><code>train_sampling_rates=[1.0]</code>, batch size 2, 1 epoch로 full local fine-tuning을 수행했다.</li>
+      <li>best validation checkpoint <code>dpr_biencoder.0</code>를 저장했다.</li>
+      <li>새 checkpoint로 전체 <code>passages.tsv</code> embedding을 다시 생성했다.</li>
+      <li>동일한 <code>test.tsv</code>와 <code>test_metadata.jsonl</code>로 Top-100 retrieval 결과를 평가했다.</li>
+      <li>Table 2에 DPR full fine-tuned 결과를 반영했다.</li>
+    </ol>
+
+    <h3>Fine-tuning 실행 조건</h3>
+    <table class="settings-table" aria-label="DPR fine-tuning settings">
+      <tbody>
+        <tr>
+          <th>항목</th>
+          <th>값</th>
+        </tr>
+        <tr>
+          <td>실행 환경</td>
+          <td>Local Apple Silicon, CUDA 미사용, <code>PYTORCH_ENABLE_MPS_FALLBACK=1</code></td>
+        </tr>
+        <tr>
+          <td>Encoder</td>
+          <td><code>bert-base-multilingual-cased</code>, <code>hf_bert</code>, <code>do_lower_case=False</code></td>
+        </tr>
+        <tr>
+          <td>Sequence length</td>
+          <td><code>256</code></td>
+        </tr>
+        <tr>
+          <td>Train data</td>
+          <td><code>data/patent/train.json</code>, full train split <code>15,948</code> queries, <code>train_sampling_rates=[1.0]</code></td>
+        </tr>
+        <tr>
+          <td>Training validation</td>
+          <td><code>data/patent/local_dev.json</code>, 24-query local dev subset</td>
+        </tr>
+        <tr>
+          <td>Final evaluation</td>
+          <td><code>data/patent/test.tsv</code>와 <code>test_metadata.jsonl</code>, <code>1,995</code> test queries</td>
+        </tr>
+        <tr>
+          <td>Batch size</td>
+          <td><code>batch_size=2</code>, <code>dev_batch_size=4</code>, <code>gradient_accumulation_steps=1</code></td>
+        </tr>
+        <tr>
+          <td>Epoch / steps</td>
+          <td><code>num_train_epochs=1</code>, 총 <code>7,974</code> training steps</td>
+        </tr>
+        <tr>
+          <td>Optimizer settings</td>
+          <td><code>learning_rate=2e-5</code>, <code>warmup_steps=10</code>, <code>weight_decay=0.0</code>, <code>max_grad_norm=2.0</code></td>
+        </tr>
+        <tr>
+          <td>Negatives</td>
+          <td><code>hard_negatives=1</code>, <code>other_negatives=0</code>, DPR in-batch negatives 사용</td>
+        </tr>
+        <tr>
+          <td>Training result</td>
+          <td>dev NLL loss <code>0.782419</code>, dev correct ratio <code>12/24 = 0.50</code>, epoch average loss <code>0.187410</code></td>
+        </tr>
+        <tr>
+          <td>Checkpoint</td>
+          <td><code>outputs/patent_dpr_local_full/dpr_biencoder.0</code></td>
+        </tr>
+        <tr>
+          <td>Embedding / retrieval</td>
+          <td>passage embedding batch size <code>16</code>, retrieval batch size <code>16</code>, <code>n_docs=100</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>In-batch negative 관점의 로컬/Colab 차이</h3>
+    <p>
+      로컬 full fine-tuning은 batch size가 <code>2</code>이므로 한 step의 question 행렬은 <code>Q in R^(2 x d)</code>이고,
+      positive만 쓰면 <code>S = QP^T</code>는 <code>2 x 2</code> score matrix가 된다. hard negative를 1개씩 붙여도
+      비교 후보는 <code>P in R^(4 x d)</code>, 즉 <code>S in R^(2 x 4)</code> 수준이다. 반면 Colab Pro checkpoint 1은
+      <code>batch_size=128</code>, <code>hard_negatives=1</code>이므로 <code>S in R^(128 x 256)</code>에서 학습했다.
+      이 차이가 zero-shot, 1% sampled, local full 대비 Colab Pro checkpoint 1의 Top-5 회복을 설명하는 핵심 조건이다.
+    </p>
+
+    <h3>현재 산출물 위치</h3>
+    <ul class="list">
+      <li><a href="../outputs/patent_dpr_local_sampled/table2_patent_retrieval.md"><code>outputs/patent_dpr_local_sampled/table2_patent_retrieval.md</code></a></li>
+      <li><a href="../outputs/patent_dpr_local_sampled/table2_dpr_topk.md"><code>outputs/patent_dpr_local_sampled/table2_dpr_topk.md</code></a></li>
+      <li><a href="../outputs/patent_dpr_local_full/table2_patent_retrieval.md"><code>outputs/patent_dpr_local_full/table2_patent_retrieval.md</code></a></li>
+      <li><a href="../outputs/patent_dpr_local_full/table2_dpr_topk.md"><code>outputs/patent_dpr_local_full/table2_dpr_topk.md</code></a></li>
+      <li><a href="../outputs/patent_dpr_local_full/dpr_eval_summary.json"><code>outputs/patent_dpr_local_full/dpr_eval_summary.json</code></a></li>
+      <li><a href="../outputs/patent_dpr_local_full/dpr_eval_summary_topk.json"><code>outputs/patent_dpr_local_full/dpr_eval_summary_topk.json</code></a></li>
+      <li><a href="../outputs/patent_dpr_local_full/dpr_results.json"><code>outputs/patent_dpr_local_full/dpr_results.json</code></a></li>
+      <li><a href="../outputs/patent_dpr_local_full/dpr_biencoder.0"><code>outputs/patent_dpr_local_full/dpr_biencoder.0</code></a></li>
+      <li><a href="../outputs/patent_dpr_zero_shot/table2_patent_retrieval.md"><code>outputs/patent_dpr_zero_shot/table2_patent_retrieval.md</code></a></li>
+      <li><a href="../outputs/patent_dpr_zero_shot/table2_dpr_topk.md"><code>outputs/patent_dpr_zero_shot/table2_dpr_topk.md</code></a></li>
+      <li><a href="../outputs/patent_dpr_zero_shot/dpr_eval_summary.json"><code>outputs/patent_dpr_zero_shot/dpr_eval_summary.json</code></a></li>
+      <li><a href="../outputs/patent_dpr_zero_shot/dpr_eval_summary_topk.json"><code>outputs/patent_dpr_zero_shot/dpr_eval_summary_topk.json</code></a></li>
+      <li><a href="../outputs/patent_dpr_local_sampled/dpr_eval_summary.json"><code>outputs/patent_dpr_local_sampled/dpr_eval_summary.json</code></a></li>
+      <li><a href="../outputs/patent_dpr_local_sampled/dpr_eval_summary_topk.json"><code>outputs/patent_dpr_local_sampled/dpr_eval_summary_topk.json</code></a></li>
+      <li><a href="../outputs/patent_dpr_local_sampled/dpr_results.json"><code>outputs/patent_dpr_local_sampled/dpr_results.json</code></a></li>
+      <li><a href="../outputs/patent_dpr_local_sampled/dpr_biencoder.0"><code>outputs/patent_dpr_local_sampled/dpr_biencoder.0</code></a></li>
+      <li><a href="../outputs/patent_dpr_colab_pro/table2_dpr_colab.md"><code>outputs/patent_dpr_colab_pro/table2_dpr_colab.md</code></a></li>
+      <li><a href="../outputs/patent_dpr_colab_pro/table2_dpr_colab_topk.md"><code>outputs/patent_dpr_colab_pro/table2_dpr_colab_topk.md</code></a></li>
+      <li><a href="../outputs/patent_dpr_colab_pro/dpr_eval_summary.json"><code>outputs/patent_dpr_colab_pro/dpr_eval_summary.json</code></a></li>
+      <li><a href="../outputs/patent_dpr_colab_pro/dpr_eval_summary_topk.json"><code>outputs/patent_dpr_colab_pro/dpr_eval_summary_topk.json</code></a></li>
+      <li><a href="../outputs/patent_dpr_colab_pro/dpr_results.json"><code>outputs/patent_dpr_colab_pro/dpr_results.json</code></a></li>
+      <li><a href="../outputs/patent_dpr_colab_pro/patent_passages_colab_0"><code>outputs/patent_dpr_colab_pro/patent_passages_colab_0</code></a></li>
+      <li><a href="../outputs/patent_dpr_colab_pro/dpr_biencoder.1"><code>outputs/patent_dpr_colab_pro/dpr_biencoder.1</code></a></li>
+      <li><a href="../outputs/patent_dpr_hybrid_rrf/table2_bm25_topk.md"><code>outputs/patent_dpr_hybrid_rrf/table2_bm25_topk.md</code></a></li>
+      <li><a href="../outputs/patent_dpr_hybrid_rrf/table2_bm25_dpr_colab_rrf_alpha09.md"><code>outputs/patent_dpr_hybrid_rrf/table2_bm25_dpr_colab_rrf_alpha09.md</code></a></li>
+      <li><a href="../outputs/patent_dpr_hybrid_rrf/bm25_dpr_colab_rrf_alpha09_eval_summary_topk.json"><code>outputs/patent_dpr_hybrid_rrf/bm25_dpr_colab_rrf_alpha09_eval_summary_topk.json</code></a></li>
+      <li><a href="../outputs/patent_dpr_hybrid_rrf/bm25_dpr_colab_rrf_alpha09_results.json"><code>outputs/patent_dpr_hybrid_rrf/bm25_dpr_colab_rrf_alpha09_results.json</code></a></li>
+      <li><a href="../DPR-main/PATENT_DPR_EXPERIMENT.md"><code>DPR-main/PATENT_DPR_EXPERIMENT.md</code></a></li>
+    </ul>
+
+    <h2 id="colab-record">8. Colab Pro 재학습 및 평가 기록</h2>
+    <div class="callout ok">
+      <strong>현재 반영한 Colab run</strong>
+      <p>
+        Colab Pro에서 <code>NVIDIA A100-SXM4-80GB</code>가 배정됐고,
+        <code>batch_size=128</code>, <code>gradient_accumulation_steps=1</code>,
+        <code>effective batch size=128</code>, <code>fp16=False</code> 조건으로 학습했다.
+        목표는 40 epoch였지만 epoch 30 이후 DPR의 average-rank validation 경로에서 device mismatch가 발생해
+        run metadata는 <code>failed</code>로 남았다. 그러나 checkpoint는 정상 저장됐고, 현재 로컬에 확보한
+        checkpoint 0-4 중 dev NLL 최선인 <code>dpr_biencoder.1</code>을 먼저 평가했다.
+      </p>
+    </div>
+
+    <h3>Colab 실행 파일</h3>
+    <ul class="list">
+      <li><a href="../colab/patent_dpr_colab_pro.ipynb"><code>colab/patent_dpr_colab_pro.ipynb</code></a>: VSCode Colab 커널 또는 Colab UI에서 실행할 notebook</li>
+      <li><a href="../colab/colab_runner.py"><code>colab/colab_runner.py</code></a>: smoke test, batch feasibility check, full training 실행 스크립트</li>
+      <li><a href="../colab/COLAB_STEPS.md"><code>colab/COLAB_STEPS.md</code></a>: Drive 업로드와 실행 절차</li>
+      <li><a href="../tools/create_colab_bundle.py"><code>tools/create_colab_bundle.py</code></a>: 기존 checkpoint와 outputs를 제외한 clean bundle 생성</li>
+      <li><a href="../tools/verify_colab_artifacts.py"><code>tools/verify_colab_artifacts.py</code></a>: Colab 산출물 로컬 검증</li>
+    </ul>
+
+    <h3>Colab full training 기록 항목</h3>
+    <table class="settings-table" aria-label="Colab Pro planned training settings">
+      <tbody>
+        <tr>
+          <th>항목</th>
+          <th>기록할 값</th>
+        </tr>
+        <tr>
+          <td>GPU</td>
+          <td><code>NVIDIA A100-SXM4-80GB</code>, VRAM <code>81920MB</code></td>
+        </tr>
+        <tr>
+          <td>Batch</td>
+          <td>actual <code>batch_size=128</code>, <code>gradient_accumulation_steps=1</code>, effective <code>128</code></td>
+        </tr>
+        <tr>
+          <td>평가 checkpoint</td>
+          <td><code>outputs/patent_dpr_colab_pro/dpr_biencoder.1</code>, 확보 checkpoint 0-4 중 dev NLL 최선</td>
+        </tr>
+        <tr>
+          <td>Run status</td>
+          <td>학습 checkpoint는 저장됐지만 epoch 30 average-rank validation에서 실패해 metadata status는 <code>failed</code></td>
+        </tr>
+        <tr>
+          <td>후처리</td>
+          <td>로컬 MPS에서 passage embedding, dense retrieval, gold patent_id Top-5/20/100 평가 수행</td>
+        </tr>
+        <tr>
+          <td>결과</td>
+          <td>Top-5 <code>98.30</code>, Top-20 <code>99.55</code>, Top-100 <code>100.00</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <footer>
+      Report version 2.19. DPR reader/generator는 범위에서 제외했고, DPR 논문 Table 2 성격의 retriever 비교까지만 포함했다.
+    </footer>
+    </div>
+  </main>
+</body>
+</html>

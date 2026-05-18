@@ -1,0 +1,22 @@
+{
+  "command": "train",
+  "workspace": "/content/HYU-DPR",
+  "output_dir": "/content/drive/MyDrive/HYU-DPR/outputs/patent_dpr_colab_pro",
+  "gpu_name": "NVIDIA A100-SXM4-80GB",
+  "gpu_total_memory_mb": 81920,
+  "actual_batch_size": 128,
+  "gradient_accumulation_steps": 1,
+  "effective_batch_size": 128,
+  "num_train_epochs": 40,
+  "sequence_length": 256,
+  "hard_negatives": 1,
+  "started_at": "2026-05-17T11:50:51.533113+00:00",
+  "finished_at": "2026-05-17T15:43:09.810399+00:00",
+  "status": "failed",
+  "fallback": false,
+  "fallback_reason": null,
+  "fp16": false,
+  "fp16_note": "DPR requires NVIDIA Apex when fp16=True.",
+  "return_code": 1,
+  "profile_config": "biencoder_patent_colab_128"
+}

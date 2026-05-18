@@ -1,0 +1,10 @@
+{
+  "method": "BM25+DPR Colab Pro weighted RRF",
+  "alpha_dpr": 0.9,
+  "alpha_bm25": 0.09999999999999998,
+  "rrf_k": 60,
+  "bm25_results": "data/patent/bm25_results.json",
+  "dpr_results": "outputs/patent_dpr_colab_pro/dpr_results.json",
+  "count": 1995,
+  "missing": 0
+}
