@@ -917,6 +917,7 @@
       <div class="toc-group">
         <a href="#examples">3. 실험 예시</a>
         <a class="sub" href="#question-examples">실제 질문 예시</a>
+        <a class="sub" href="#highlight-analysis">하이라이트 해석</a>
         <a class="sub" href="#vector-space">Vector space</a>
         <a class="sub" href="#example-a">예시 A</a>
         <a class="sub" href="#example-b">예시 B</a>
@@ -1463,6 +1464,27 @@
         <code>발명의 명칭</code>으로 질문 문장을 만들고, 정답 답변은 같은 row의
         <code>AI요약(목적)</code> 컬럼을 사용한다. 따라서 예시 A/B의 정답 답변은 DPR이나 BM25가 만든 문장이 아니라
         <code>patent_rawdata.csv</code>에 이미 들어 있던 AI 요약 컬럼에서 온 pseudo answer다.
+      </p>
+    </div>
+
+    <div id="highlight-analysis" class="callout ok section-spacer">
+      <strong>BM25 vs DPR zero-shot vs DPR Colab 하이라이트 해석</strong>
+      <p>
+        예시 B/D의 상세 검색 내용에서 하이라이트 패턴을 보면 세 방법의 차이가 직관적으로 드러난다.
+        BM25는 query에 들어간 <code>High performance computing system for deep learning</code>과 passage title의
+        표면 문자열이 강하게 겹치기 때문에 Top-5 전체에 하이라이트가 빽빽하게 찍힌다. 이 방식은 정답 특허를 빠르게 찾지만,
+        같은 제목이나 번역 제목을 가진 다른 <code>patent_id</code>도 함께 올리는 한계가 있다.
+      </p>
+      <p>
+        DPR zero-shot은 하이라이트가 거의 보이지 않는 무관한 passage를 상위에 올린다. 이는 파인튜닝 전 mBERT embedding 공간이
+        특허 검색 목적에 아직 맞춰져 있지 않다는 뜻이다. 반면 DPR Colab Pro checkpoint 1은 fine-tuning 후
+        제목뿐 아니라 기술 목적, 해결수단, <code>host processor</code>, <code>accelerators</code>,
+        <code>memory nodes</code> 같은 내용 단서가 들어 있는 chunk를 상위에 배치한다.
+      </p>
+      <p>
+        따라서 하이라이트는 의미 검색을 직접 증명하는 지표라기보다는 retrieval 결과를 해석하는 정성적 단서다.
+        요약하면, <strong>BM25는 제목 일치로 찾고, DPR zero-shot은 거의 못 찾고, DPR Colab은 fine-tuning 후
+        질문 의도와 관련된 기술 내용 chunk를 회수한다.</strong>
       </p>
     </div>
 
@@ -2815,7 +2837,7 @@ S = QP^T in R^(B x 2B)</pre>
     </table>
 
     <footer>
-      Report version 2.20. DPR reader/generator는 범위에서 제외했고, DPR 논문 Table 2 성격의 retriever 비교까지만 포함했다.
+      Report version 2.21. DPR reader/generator는 범위에서 제외했고, DPR 논문 Table 2 성격의 retriever 비교까지만 포함했다.
     </footer>
     </div>
   </main>

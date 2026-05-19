@@ -945,6 +945,7 @@
       <div class="toc-group">
         <a href="#case-d">예시 D</a>
         <a class="sub" href="#case-d">고성능 딥러닝 purpose+solution</a>
+        <a class="sub" href="#case-d-highlight-analysis">하이라이트 3단 비교</a>
         <a class="sub" href="#case-d-table">전체 Top-k 검색 내용</a>
       </div>
     </nav>
@@ -5078,6 +5079,39 @@
         <p class="vector-space-caption">
           Colab Pro checkpoint 1의 실제 passage embedding을 PCA로 2차원 축소한 local vector space다.
           예시 D는 purpose와 solution을 함께 묻는 복합 질문이다. BM25와 Colab DPR은 rank 1부터 gold passage를 회수하고, local full은 Top-20부터 정답 특허에 도달한다.
+        </p>
+      </div>
+      <div id="case-d-highlight-analysis" class="callout ok section-spacer">
+        <strong>BM25 vs DPR zero-shot vs DPR Colab: 하이라이트 3단 비교</strong>
+        <p>
+          <strong>BM25 Top-5</strong>는 하이라이트가 거의 모든 passage에 빽빽하게 찍힌다.
+          query에 <code>High performance computing system for deep learning</code>이 그대로 들어 있고,
+          passage title에도 같은 문자열이나 한국어 번역 제목이 들어 있기 때문이다. BM25는 이 표면 단어 일치만으로
+          rank 1부터 정답 특허 <code>19-007055</code>를 잡아낸다.
+        </p>
+        <p>
+          동시에 BM25 Top-5에는 정답 특허 chunk 2개와 함께 <code>16-595992</code>, <code>2018-0120634</code>처럼
+          제목이 같거나 번역 제목이 매우 유사한 다른 특허도 올라온다. 즉 BM25는 제목 매칭에 강하지만,
+          제목이 같은 특허들을 세밀하게 구분하지 못하고 함께 올린다. 이 점이 BM25의 한계이자,
+          본 실험에서 BM25가 강하게 보이는 이유다.
+        </p>
+        <p>
+          <strong>DPR zero-shot Top-5</strong>는 하이라이트가 거의 보이지 않는다.
+          상위 passage가 분산/협력 계산, 신경망 양자화, 의류 디자인 시스템처럼 query와 직접 관련이 약한 특허로 채워지며,
+          정답 특허는 Top-50에도 들어오지 않는다. 파인튜닝 전 mBERT embedding은 특허 도메인의 retrieval 목적에
+          아직 정렬되어 있지 않기 때문에, query 핵심 키워드가 없는 passage도 embedding 공간에서 가깝게 잡힌다.
+        </p>
+        <p>
+          <strong>DPR Colab Pro Top-5</strong>에서는 하이라이트가 다시 빽빽하게 나타나지만, BM25와 해석이 다르다.
+          rank 1부터 단순 제목 chunk만이 아니라 <code>host processor</code>, <code>accelerators</code>,
+          <code>memory nodes</code>, 그리고 “호스트 메모리를 사용하지 않고 신속하게 데이터를 처리”한다는
+          기술 목적/해결수단 단서가 포함된 passage가 올라온다. 이는 DPR Colab이 fine-tuning 후 질문의
+          목적+솔루션 의도와 관련된 기술 내용 chunk를 상위에 배치한다는 정성적 근거다.
+        </p>
+        <p>
+          정리하면, 하이라이트는 의미 검색을 직접 증명하는 지표가 아니라 retrieval 결과를 읽는 보조 단서다.
+          이 단서를 기준으로 보면 <strong>BM25는 제목 일치로 찾고, DPR zero-shot은 거의 못 찾고,
+          DPR Colab은 fine-tuning 후 기술 내용이 맞는 chunk를 회수한다.</strong>
         </p>
       </div>
       <table id="case-d-table" class="settings-table" aria-label="case D detailed top k search contents">
