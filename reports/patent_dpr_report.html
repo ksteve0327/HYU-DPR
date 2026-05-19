@@ -928,6 +928,7 @@
         <a href="#dpr-training">5. DPR 학습 구조</a>
         <a class="sub" href="#q-matrix">Q 행렬 / In-batch</a>
         <a class="sub" href="#qps-viz">Q/P/S 전체 시각화</a>
+        <a class="sub" href="#finetuning-code-flow">Fine-tuning 코드 흐름</a>
       </div>
       <div class="toc-group">
         <a href="#interpretation">6. 현재 결과 해석</a>
@@ -2442,6 +2443,113 @@ S = QP^T in R^(B x 2B)</pre>
       0-based 기준 <code>[0, 2, 4, ..., 254]</code>다.
     </div>
 
+    <h3 id="finetuning-code-flow">코드 기준 Fine-tuning 흐름</h3>
+    <p>
+      아래 표는 실제 코드 실행 흐름만 정리한 것이다. 핵심은 전처리 스크립트가 DPR 형식의
+      <code>train.json</code>/<code>dev.json</code>을 만들고, Colab runner가 Hydra 설정으로
+      <code>train_dense_encoder.py</code>를 실행하며, DPR bi-encoder가 batch 내부의 positive와 negative를
+      score matrix로 학습한다는 점이다.
+    </p>
+    <table class="settings-table" aria-label="DPR fine-tuning code flow">
+      <tbody>
+        <tr>
+          <th>단계</th>
+          <th>코드 위치</th>
+          <th>역할</th>
+          <th>결과</th>
+        </tr>
+        <tr>
+          <td>1. 데이터 전처리</td>
+          <td><a href="../DPR-main/scripts/prepare_patent_dpr.py"><code>DPR-main/scripts/prepare_patent_dpr.py</code></a></td>
+          <td>
+            특허 CSV를 읽고 <code>graphrag_text</code>를 passage chunk로 나눈다.
+            특허 단위로 train/dev/test를 split하고, <code>purpose</code>,
+            <code>solution</code>, <code>purpose_solution</code> query를 생성한다.
+          </td>
+          <td><code>passages.tsv</code>, <code>train.json</code>, <code>dev.json</code>, <code>test.tsv</code></td>
+        </tr>
+        <tr>
+          <td>2. Positive / hard negative 구성</td>
+          <td><code>make_dpr_samples()</code></td>
+          <td>
+            각 query에 같은 <code>patent_id</code>의 <code>positive_ctxs</code>를 붙이고,
+            BM25 상위 검색 결과 중 다른 <code>patent_id</code> passage 1개를
+            <code>hard_negative_ctxs</code>로 저장한다.
+          </td>
+          <td>DPR bi-encoder 학습 샘플</td>
+        </tr>
+        <tr>
+          <td>3. 학습 명령 생성</td>
+          <td><a href="../colab/colab_runner.py"><code>colab/colab_runner.py</code></a></td>
+          <td>
+            <code>train_dense_encoder.py</code> 실행 명령을 만든다.
+            실제 run은 <code>train_datasets=[patent_train]</code>,
+            <code>dev_datasets=[patent_dev]</code>, <code>train=biencoder_patent_colab_128</code>,
+            <code>encoder=hf_mbert</code>, <code>do_lower_case=False</code> 조건으로 실행한다.
+          </td>
+          <td>Colab/로컬 fine-tuning job 실행</td>
+        </tr>
+        <tr>
+          <td>4. 학습 설정 로드</td>
+          <td>
+            <a href="../DPR-main/conf/train/biencoder_patent_colab_128.yaml"><code>biencoder_patent_colab_128.yaml</code></a>,
+            <a href="../DPR-main/conf/encoder/hf_mbert.yaml"><code>hf_mbert.yaml</code></a>
+          </td>
+          <td>
+            Colab Pro 기준 <code>batch_size=128</code>, <code>gradient_accumulation_steps=1</code>,
+            <code>num_train_epochs=40</code>, <code>hard_negatives=1</code>,
+            encoder <code>bert-base-multilingual-cased</code>, sequence length <code>256</code>을 사용한다.
+          </td>
+          <td>Hydra config로 trainer 초기화</td>
+        </tr>
+        <tr>
+          <td>5. Bi-encoder 초기화</td>
+          <td><a href="../DPR-main/train_dense_encoder.py"><code>train_dense_encoder.py</code></a> / <code>BiEncoderTrainer</code></td>
+          <td>
+            question encoder, passage encoder, tensorizer, optimizer, scheduler를 초기화한다.
+            이후 train iterator가 <code>train.json</code> sample을 batch 단위로 공급한다.
+          </td>
+          <td>DPR 학습 루프 준비</td>
+        </tr>
+        <tr>
+          <td>6. Batch 구성</td>
+          <td><a href="../DPR-main/dpr/models/biencoder.py"><code>dpr/models/biencoder.py</code></a> / <code>create_biencoder_input()</code></td>
+          <td>
+            각 sample에서 question 1개, positive passage 1개, BM25 hard negative 1개를 tensor로 만든다.
+            batch 128이면 question은 128개, passage 후보는 positive 128개와 hard negative 128개다.
+          </td>
+          <td><code>Q in R^(128 x 768)</code>, <code>P in R^(256 x 768)</code></td>
+        </tr>
+        <tr>
+          <td>7. Loss 계산</td>
+          <td><code>BiEncoderNllLoss.calc()</code></td>
+          <td>
+            <code>S = QP^T</code> score matrix를 만들고 각 question row에서 자기 positive passage column을 정답으로 둔다.
+            <code>log_softmax</code>와 <code>NLL loss</code>를 적용해 positive score가 가장 커지도록 학습한다.
+          </td>
+          <td><code>S in R^(128 x 256)</code>, in-batch negative + BM25 hard negative 학습</td>
+        </tr>
+        <tr>
+          <td>8. Backprop / checkpoint</td>
+          <td><code>_train_epoch()</code>, <code>validate_and_save()</code></td>
+          <td>
+            <code>loss.backward()</code> 후 gradient clipping, <code>optimizer.step()</code>,
+            <code>scheduler.step()</code>을 수행한다. eval step마다 dev NLL 또는 average-rank validation을 수행하고 checkpoint를 저장한다.
+          </td>
+          <td><code>dpr_biencoder.*</code> checkpoint 생성</td>
+        </tr>
+      </tbody>
+    </table>
+    <pre>patent_rawdata.csv
+→ prepare_patent_dpr.py
+→ train.json / dev.json with positive_ctxs and hard_negative_ctxs
+→ colab_runner.py train command
+→ train_dense_encoder.py / BiEncoderTrainer
+→ create_biencoder_input()
+→ QP^T score matrix
+→ NLL loss + backprop
+→ dpr_biencoder checkpoint</pre>
+
     <h2 id="interpretation">6. 현재 결과 해석</h2>
     <div class="callout" style="margin-top: 16px;">
       <strong>DPR 및 BM25 수치가 높게 나오는 이유</strong>
@@ -2707,7 +2815,7 @@ S = QP^T in R^(B x 2B)</pre>
     </table>
 
     <footer>
-      Report version 2.19. DPR reader/generator는 범위에서 제외했고, DPR 논문 Table 2 성격의 retriever 비교까지만 포함했다.
+      Report version 2.20. DPR reader/generator는 범위에서 제외했고, DPR 논문 Table 2 성격의 retriever 비교까지만 포함했다.
     </footer>
     </div>
   </main>
